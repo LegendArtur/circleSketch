@@ -1,0 +1,7 @@
+discord.py
+apscheduler
+python-dotenv
+pillow
+colorama
+requests
+pytest
