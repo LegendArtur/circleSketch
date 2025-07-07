@@ -1,0 +1,317 @@
+import discord
+from discord import app_commands, Interaction
+from discord.ext import commands
+from .config import DISCORD_TOKEN, GAME_CHANNEL_ID
+from .storage.storage_sqlite import Storage
+from .prompts import PROMPT_LIST
+from .gallery.gallery import make_gallery_image, make_theme_announcement_image
+import asyncio
+import logging
+import random
+import datetime
+import os
+import io
+from colorama import Fore, Style, init as colorama_init
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+colorama_init(autoreset=True)
+
+DEV_MODE = os.getenv('DEV_MODE', 'False').lower() == 'true'
+DEV_USER_ID = int(os.getenv('DEV_USER_ID', '269634149726289930'))
+
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
+
+intents = discord.Intents.default()
+intents.members = True
+intents.messages = True
+bot = commands.Bot(command_prefix="/", intents=intents)
+tree = bot.tree
+
+CIRCLE_LIMIT = 10
+
+def is_admin(interaction: Interaction):
+    return interaction.user.guild_permissions.administrator
+
+@tree.command(name="join_circle", description="Join the persistent player circle.")
+async def join_circle(interaction: Interaction):
+    user_id = interaction.user.id
+    circle = Storage.get_player_circle()
+    if user_id in circle:
+        await interaction.response.send_message("You are already in the circle.", ephemeral=True)
+        logging.info(f"User {user_id} tried to join but is already in the circle.")
+        return
+    if len(circle) >= CIRCLE_LIMIT:
+        await interaction.response.send_message(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
+        logging.info(f"User {user_id} tried to join but the circle is full.")
+        return
+    circle.append(user_id)
+    Storage.set_player_circle(circle)
+    await interaction.response.send_message(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
+    logging.info(f"User {user_id} joined the circle. Now {len(circle)}/{CIRCLE_LIMIT}.")
+    state = Storage.get_game_state()
+    if state and 'theme' in state:
+        # Add new user to current game's user_ids if not already present
+        if user_id not in state.get('user_ids', []):
+            state['user_ids'].append(user_id)
+            Storage.set_game_state(state)
+            logging.info(f"Added user {user_id} to current game's user_ids.")
+        try:
+            user = await bot.fetch_user(user_id)
+            await user.send(f"A game is currently running! Today's drawing theme: **{state['theme']}**. Please reply with your drawing as an image attachment.")
+            logging.info(f"Sent DM to new joiner {user_id} during active game.")
+        except Exception as e:
+            logging.error(f"Failed to DM new joiner {user_id}: {e}")
+
+@tree.command(name="leave_circle", description="Leave the persistent player circle.")
+async def leave_circle(interaction: Interaction):
+    user_id = interaction.user.id
+    circle = Storage.get_player_circle()
+    if user_id not in circle:
+        await interaction.response.send_message("You are not in the circle.", ephemeral=True)
+        logging.info(f"User {user_id} tried to leave but was not in the circle.")
+        return
+    circle.remove(user_id)
+    Storage.set_player_circle(circle)
+    await interaction.response.send_message("You have left the circle.", ephemeral=True)
+    logging.info(f"User {user_id} left the circle.")
+
+@tree.command(name="list_circle", description="List current members of the player circle.")
+async def list_circle(interaction: Interaction):
+    circle = Storage.get_player_circle()
+    if not circle:
+        await interaction.response.send_message("The player circle is currently empty.", ephemeral=True)
+        logging.info(f"User {interaction.user.id} listed the circle (empty).")
+        return
+    members = []
+    for user_id in circle:
+        member = interaction.guild.get_member(user_id)
+        if member:
+            members.append(member.display_name)
+        else:
+            members.append(f"<@{user_id}>")
+    await interaction.response.send_message(f"Current Players ({len(circle)}/{CIRCLE_LIMIT}): {', '.join(members)}", ephemeral=True)
+    logging.info(f"User {interaction.user.id} listed the circle: {members}")
+
+@tree.command(name="reset_circle", description="[Admin] Reset the player circle.")
+@app_commands.check(is_admin)
+async def reset_circle(interaction: Interaction):
+    class Confirm(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=30)
+            self.value = None
+        @discord.ui.button(label="Are you sure?", style=discord.ButtonStyle.danger)
+        async def confirm(self, interaction2: Interaction, button: discord.ui.Button):
+            Storage.reset()
+            await interaction2.response.edit_message(content="Player circle has been reset.", view=None)
+            self.value = True
+            self.stop()
+            logging.info(f"Admin {interaction2.user.id} reset the circle.")
+    await interaction.response.send_message("Are you sure you want to reset the player circle?", view=Confirm(), ephemeral=True)
+
+@reset_circle.error
+async def reset_circle_error(interaction: Interaction, error):
+    if isinstance(error, app_commands.errors.CheckFailure):
+        await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
+        logging.warning(f"User {interaction.user.id} tried to reset the circle without permission.")
+
+def log_info(msg):
+    print(Fore.CYAN + Style.BRIGHT + f"[INFO] {msg}" + Style.RESET_ALL)
+
+def log_success(msg):
+    print(Fore.GREEN + Style.BRIGHT + f"[SUCCESS] {msg}" + Style.RESET_ALL)
+
+def log_warn(msg):
+    print(Fore.YELLOW + Style.BRIGHT + f"[WARN] {msg}" + Style.RESET_ALL)
+
+def log_error(msg):
+    print(Fore.RED + Style.BRIGHT + f"[ERROR] {msg}" + Style.RESET_ALL)
+
+async def post_prompt_and_collect(channel, theme, date_str, user_ids):
+    img_bytes = make_theme_announcement_image(theme)
+    file = discord.File(img_bytes, filename="theme.png")
+    await channel.send(content="", file=file)
+    Storage.set_game_state({
+        'theme': theme,
+        'date': date_str,
+        'submissions': {},
+        'gallery': {},
+        'start_time': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        'user_ids': user_ids
+    })
+    for user_id in user_ids:
+        try:
+            user = await bot.fetch_user(user_id)
+            await user.send(f"Today's drawing theme: **{theme}**. Please reply with your drawing as an image attachment.")
+            log_info(f"DM sent to user {user_id} for daily prompt.")
+        except Exception as e:
+            log_error(f"Failed to DM user {user_id}: {e}")
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    state = Storage.get_game_state()
+    if not state or 'theme' not in state:
+        return
+    user_id = message.author.id
+    if DEV_MODE and user_id == DEV_USER_ID and isinstance(message.channel, discord.DMChannel):
+        if not message.attachments:
+            await message.channel.send("Please submit an image attachment.")
+            logging.info(f"[DEV] User {user_id} submitted without an image.")
+            return
+        img_url = message.attachments[0].url
+        theme = state['theme']
+        date_str = state['date']
+        user = await bot.fetch_user(user_id)
+        img_bytes = make_gallery_image(theme, date_str, user, img_url)
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        file = discord.File(img_bytes, filename=f"gallery_{user_id}.png")
+        await channel.send(file=file)
+        await message.channel.send("Submission received and posted!")
+        logging.info(f"[DEV] User {user_id} submitted and image posted.")
+        Storage.set_game_state(None)
+        return
+    if not DEV_MODE and isinstance(message.channel, discord.DMChannel):
+        if user_id not in state.get('user_ids', []):
+            return
+        if user_id in state['submissions']:
+            await message.channel.send("You have already submitted for today's game!")
+            log_info(f"User {user_id} tried to submit again.")
+            return
+        if not message.attachments:
+            await message.channel.send("Please submit an image attachment.")
+            log_info(f"User {user_id} submitted without an image.")
+            return
+        img_url = message.attachments[0].url
+        state['submissions'][user_id] = img_url
+        state['gallery'][user_id] = img_url
+        Storage.set_game_state(state)
+        await message.channel.send("Submission received! Thank you.")
+        log_info(f"User {user_id} submitted their drawing.")
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        await channel.send(f"<@{user_id}> has submitted their image for today! You can still join the current game by typing `/join_circle`.")
+
+async def end_daily_game(channel):
+    state = Storage.get_game_state()
+    if not state or 'theme' not in state:
+        return
+    theme = state['theme']
+    date_str = state['date']
+    gallery = state.get('gallery', {})
+    if not gallery:
+        await channel.send(f"No submissions for today's theme: **{theme}**.")
+        log_info("No submissions to reveal.")
+    else:
+        await channel.send(f"Gallery for '**{theme}**' - {date_str}!")
+        for user_id, img_url in gallery.items():
+            user = await bot.fetch_user(int(user_id))
+            img_bytes = make_gallery_image(theme, date_str, user, img_url)
+            file = discord.File(img_bytes, filename=f"gallery_{user_id}.png")
+            await channel.send(file=file)
+            log_info(f"Posted gallery image for user {user_id}.")
+    Storage.set_game_state(None)
+    log_info("Game state reset for next round.")
+
+@bot.event
+async def on_ready():
+    log_info(f"Logged in as {bot.user}")
+    try:
+        synced = await tree.sync()
+        log_info(f"Synced {len(synced)} commands.")
+    except Exception as e:
+        log_error(f"Failed to sync commands: {e}")
+    if scheduled_mode_enabled and not scheduler.running:
+        scheduler.start()
+
+if DEV_MODE:
+    logging.info("DEV_MODE is enabled. Registering /dev_start_game command.")
+    @tree.command(name="dev_start_game", description="[DEV] Start a dev mode game with one user.")
+    async def dev_start_game(interaction: Interaction):
+        logging.info("/dev_start_game command invoked.")
+        if interaction.user.id != DEV_USER_ID:
+            await interaction.response.send_message("Only the dev user can use this.", ephemeral=True)
+            logging.info(f"User {interaction.user.id} tried to use /dev_start_game but is not DEV_USER_ID.")
+            return
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        theme = random.choice(PROMPT_LIST)
+        date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
+        await post_prompt_and_collect(channel, theme, date_str, [DEV_USER_ID])
+        await interaction.response.send_message(f"Dev game started for <@{DEV_USER_ID}>. Post your image in the channel.", ephemeral=True)
+        logging.info(f"Dev game started for user {DEV_USER_ID}.")
+else:
+    scheduled_mode_enabled = False
+    manual_game_starter_id = None
+    scheduler = AsyncIOScheduler()
+    async def start_daily_game():
+        circle = Storage.get_player_circle()
+        if len(circle) < 1:
+            logging.info("Not enough players to start the game.")
+            return
+        theme = random.choice(PROMPT_LIST)
+        date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        await post_prompt_and_collect(channel, theme, date_str, circle)
+    async def end_game_job():
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        await end_daily_game(channel)
+    scheduler.add_job(lambda: asyncio.create_task(start_daily_game()), 'cron', hour=21, minute=0)
+    scheduler.add_job(lambda: asyncio.create_task(end_game_job()), 'cron', hour=21, minute=0, second=10)
+    @tree.command(name="start_scheduled_game", description="Start daily scheduled game mode (5pm UTC)")
+    async def start_scheduled_game(interaction: Interaction):
+        global scheduled_mode_enabled
+        if scheduled_mode_enabled:
+            await interaction.response.send_message("Scheduled game mode is already running.", ephemeral=True)
+            return
+        scheduled_mode_enabled = True
+        async def scheduled_start():
+            channel = bot.get_channel(GAME_CHANNEL_ID)
+            circle = Storage.get_player_circle()
+            if len(circle) < 1:
+                log_info("Not enough players to start the game.")
+                return
+            theme = random.choice(PROMPT_LIST)
+            date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
+            await post_prompt_and_collect(channel, theme, date_str, circle)
+        async def scheduled_end():
+            channel = bot.get_channel(GAME_CHANNEL_ID)
+            await end_daily_game(channel)
+        scheduler.add_job(lambda: asyncio.create_task(scheduled_start()), 'cron', hour=17, minute=0)
+        scheduler.add_job(lambda: asyncio.create_task(scheduled_end()), 'cron', hour=17, minute=0, second=10)
+        await interaction.response.send_message("Scheduled game mode enabled. Daily games will start at 5pm UTC.", ephemeral=True)
+        log_info(f"Scheduled game mode enabled by {interaction.user.id}")
+    @tree.command(name="start_manual_game", description="Start a manual game (ends only when ended by the starter)")
+    async def start_manual_game(interaction: Interaction):
+        global manual_game_starter_id
+        if manual_game_starter_id is not None:
+            await interaction.response.send_message("A manual game is already running.", ephemeral=True)
+            return
+        manual_game_starter_id = interaction.user.id
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        circle = Storage.get_player_circle()
+        if len(circle) < 1:
+            await interaction.response.send_message("Not enough players to start the game.", ephemeral=True)
+            return
+        theme = random.choice(PROMPT_LIST)
+        date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
+        await post_prompt_and_collect(channel, theme, date_str, circle)
+        await interaction.response.send_message("Manual game started. Use /end_manual_game to end.", ephemeral=True)
+        log_info(f"Manual game started by {interaction.user.id}")
+
+    @tree.command(name="end_manual_game", description="End the current manual game and post the gallery.")
+    async def end_manual_game(interaction: Interaction):
+        global manual_game_starter_id
+        if manual_game_starter_id is None:
+            await interaction.response.send_message("No manual game is running.", ephemeral=True)
+            return
+        if interaction.user.id != manual_game_starter_id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Only the game starter or an admin can end the game.", ephemeral=True)
+            return
+        await interaction.response.defer(ephemeral=True)
+        channel = bot.get_channel(GAME_CHANNEL_ID)
+        await end_daily_game(channel)
+        manual_game_starter_id = None
+        await interaction.followup.send("Manual game ended and gallery posted.", ephemeral=True)
+        log_info(f"Manual game ended by {interaction.user.id}")
+
+if __name__ == "__main__":
+    bot.run(DISCORD_TOKEN)

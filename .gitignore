@@ -1,0 +1,37 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# SQLite database (do not commit user/game data)
+circle_sketch/storage.sqlite3
+
+# Environment variables (never commit secrets)
+.env
+.env.*
+
+# VSCode and editor settings
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test output and generated images
+tests/output/
+*.jpg
+*.png
+temp_result*
+
+# Logs
+*.log
+
+# Python virtual environments
+venv/
+.env/
+ENV/
+
+# Misc
+bot/
