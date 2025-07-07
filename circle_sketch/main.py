@@ -34,67 +34,76 @@ def is_admin(interaction: Interaction):
 
 @tree.command(name="join_circle", description="Join the persistent player circle.")
 async def join_circle(interaction: Interaction):
+    await interaction.response.defer(ephemeral=True)
     user_id = interaction.user.id
+    username = interaction.user.display_name
     circle = Storage.get_player_circle()
     if user_id in circle:
-        await interaction.response.send_message("You are already in the circle.", ephemeral=True)
-        logging.info(f"User {user_id} tried to join but is already in the circle.")
+        log_info(f"User {username} ({user_id}) tried to join but is already in the circle.")
+        await interaction.followup.send("You are already in the circle.", ephemeral=True)
         return
     if len(circle) >= CIRCLE_LIMIT:
-        await interaction.response.send_message(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
-        logging.info(f"User {user_id} tried to join but the circle is full.")
+        log_info(f"User {username} ({user_id}) tried to join but the circle is full.")
+        await interaction.followup.send(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
         return
     circle.append(user_id)
     Storage.set_player_circle(circle)
-    await interaction.response.send_message(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
-    logging.info(f"User {user_id} joined the circle. Now {len(circle)}/{CIRCLE_LIMIT}.")
+    channel = bot.get_channel(GAME_CHANNEL_ID)
+    await channel.send(f"<@{user_id}> ({username}) joined the Circle!")
+    await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
+    log_success(f"User {username} ({user_id}) joined the circle. Now {len(circle)}/{CIRCLE_LIMIT}.")
     state = Storage.get_game_state()
     if state and 'theme' in state:
-        # Add new user to current game's user_ids if not already present
         if user_id not in state.get('user_ids', []):
             state['user_ids'].append(user_id)
             Storage.set_game_state(state)
-            logging.info(f"Added user {user_id} to current game's user_ids.")
+            log_info(f"Added user {username} ({user_id}) to current game's user_ids.")
         try:
             user = await bot.fetch_user(user_id)
             await user.send(f"A game is currently running! Today's drawing theme: **{state['theme']}**. Please reply with your drawing as an image attachment.")
-            logging.info(f"Sent DM to new joiner {user_id} during active game.")
+            log_info(f"Sent DM to new joiner {username} ({user_id}) during active game.")
         except Exception as e:
-            logging.error(f"Failed to DM new joiner {user_id}: {e}")
+            log_error(f"Failed to DM new joiner {username} ({user_id}): {e}")
 
 @tree.command(name="leave_circle", description="Leave the persistent player circle.")
 async def leave_circle(interaction: Interaction):
+    await interaction.response.defer(ephemeral=True)
     user_id = interaction.user.id
+    username = interaction.user.display_name
     circle = Storage.get_player_circle()
     if user_id not in circle:
-        await interaction.response.send_message("You are not in the circle.", ephemeral=True)
-        logging.info(f"User {user_id} tried to leave but was not in the circle.")
+        log_info(f"User {username} ({user_id}) tried to leave but was not in the circle.")
+        await interaction.followup.send("You are not in the circle.", ephemeral=True)
         return
     circle.remove(user_id)
     Storage.set_player_circle(circle)
-    await interaction.response.send_message("You have left the circle.", ephemeral=True)
-    logging.info(f"User {user_id} left the circle.")
+    await interaction.followup.send("You have left the circle.", ephemeral=True)
+    log_success(f"User {username} ({user_id}) left the circle.")
 
 @tree.command(name="list_circle", description="List current members of the player circle.")
 async def list_circle(interaction: Interaction):
+    await interaction.response.defer(ephemeral=True)
     circle = Storage.get_player_circle()
     if not circle:
-        await interaction.response.send_message("The player circle is currently empty.", ephemeral=True)
-        logging.info(f"User {interaction.user.id} listed the circle (empty).")
+        log_info(f"User {interaction.user.display_name} ({interaction.user.id}) listed the circle (empty).")
+        await interaction.followup.send("The player circle is currently empty.", ephemeral=True)
         return
     members = []
     for user_id in circle:
         member = interaction.guild.get_member(user_id)
         if member:
-            members.append(member.display_name)
+            members.append(f"{member.display_name} ({user_id})")
         else:
             members.append(f"<@{user_id}>")
-    await interaction.response.send_message(f"Current Players ({len(circle)}/{CIRCLE_LIMIT}): {', '.join(members)}", ephemeral=True)
-    logging.info(f"User {interaction.user.id} listed the circle: {members}")
+    await interaction.followup.send(f"Current Players ({len(circle)}/{CIRCLE_LIMIT}): {', '.join(members)}", ephemeral=True)
+    log_info(f"User {interaction.user.display_name} ({interaction.user.id}) listed the circle: {members}")
 
 @tree.command(name="reset_circle", description="[Admin] Reset the player circle.")
 @app_commands.check(is_admin)
 async def reset_circle(interaction: Interaction):
+    await interaction.response.defer(ephemeral=True)
+    username = interaction.user.display_name
+    user_id = interaction.user.id
     class Confirm(discord.ui.View):
         def __init__(self):
             super().__init__(timeout=30)
@@ -105,8 +114,8 @@ async def reset_circle(interaction: Interaction):
             await interaction2.response.edit_message(content="Player circle has been reset.", view=None)
             self.value = True
             self.stop()
-            logging.info(f"Admin {interaction2.user.id} reset the circle.")
-    await interaction.response.send_message("Are you sure you want to reset the player circle?", view=Confirm(), ephemeral=True)
+            log_success(f"Admin {username} ({user_id}) reset the circle.")
+    await interaction.followup.send("Are you sure you want to reset the player circle?", ephemeral=True, view=Confirm())
 
 @reset_circle.error
 async def reset_circle_error(interaction: Interaction, error):
@@ -129,7 +138,7 @@ def log_error(msg):
 async def post_prompt_and_collect(channel, theme, date_str, user_ids):
     img_bytes = make_theme_announcement_image(theme)
     file = discord.File(img_bytes, filename="theme.png")
-    await channel.send(content="", file=file)
+    await channel.send(content="@everyone Today's game is starting!", file=file)
     Storage.set_game_state({
         'theme': theme,
         'date': date_str,
