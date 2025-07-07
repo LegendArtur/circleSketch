@@ -49,7 +49,7 @@ async def join_circle(interaction: Interaction):
     circle.append(user_id)
     Storage.set_player_circle(circle)
     channel = bot.get_channel(GAME_CHANNEL_ID)
-    await channel.send(f"<@{user_id}> ({username}) joined the Circle!")
+    await channel.send(f"<@{user_id}> joined the Circle!")
     await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
     log_success(f"User {username} ({user_id}) joined the circle. Now {len(circle)}/{CIRCLE_LIMIT}.")
     state = Storage.get_game_state()
@@ -108,14 +108,24 @@ async def reset_circle(interaction: Interaction):
         def __init__(self):
             super().__init__(timeout=30)
             self.value = None
-        @discord.ui.button(label="Are you sure?", style=discord.ButtonStyle.danger)
+        @discord.ui.button(label="Yes. I am sure.", style=discord.ButtonStyle.danger)
         async def confirm(self, interaction2: Interaction, button: discord.ui.Button):
             Storage.reset()
             await interaction2.response.edit_message(content="Player circle has been reset.", view=None)
             self.value = True
             self.stop()
             log_success(f"Admin {username} ({user_id}) reset the circle.")
-    await interaction.followup.send("Are you sure you want to reset the player circle?", ephemeral=True, view=Confirm())
+        async def on_timeout(self):
+            # When the view times out, edit the message to indicate cancellation
+            for item in self.children:
+                item.disabled = True
+            try:
+                await self.message.edit(content="Reset cancelled (no confirmation received).", view=None)
+            except Exception as e:
+                log_warn(f"Failed to edit message on reset timeout: {e}")
+    view = Confirm()
+    msg = await interaction.followup.send("Are you sure you want to reset the player circle?", ephemeral=True, view=view)
+    view.message = msg
 
 @reset_circle.error
 async def reset_circle_error(interaction: Interaction, error):
