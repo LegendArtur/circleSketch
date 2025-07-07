@@ -11,6 +11,7 @@ CircleSketch is a robust, production-ready Discord bot for running daily asynchr
 - Robust, concurrent-safe storage (SQLite)
 - Clear, colorized logging (colorama)
 - Debug/test scripts for gallery output
+- Full test suite with pytest
 
 ## Setup
 1. **Clone the repository**
@@ -22,11 +23,11 @@ CircleSketch is a robust, production-ready Discord bot for running daily asynchr
    - Copy `.env.example` to `.env` and fill in your Discord bot token and channel ID.
 4. **Run the bot**
    ```sh
-   python -m bot.main
+   python -m circle_sketch.main
    ```
 
 ## Configuration
-- `bot/config.py`: Set up your Discord token, game channel, and other settings.
+- `circle_sketch/config.py`: Set up your Discord token, game channel, and other settings.
 - `.env`: Store sensitive credentials (not committed to git).
 
 ## Commands
@@ -47,7 +48,7 @@ CircleSketch is a robust, production-ready Discord bot for running daily asynchr
 5. At the end, a gallery image is generated and posted
 
 ## Storage
-- All persistent data (player circle, game state) is stored in `bot/storage.sqlite3` via `sqlite3`.
+- All persistent data (player circle, game state) is stored in `circle_sketch/storage.sqlite3` via `sqlite3`.
 - No JSON files or in-memory state; safe for concurrent/multi-process use.
 
 ## Gallery Generation
@@ -55,7 +56,14 @@ CircleSketch is a robust, production-ready Discord bot for running daily asynchr
 - User avatars and drawing images are fetched and composed with dynamic sizing, colored borders, and bundled fonts for portability.
 
 ## Debugging
-- `bot/debug_gallery.py` can be used to test gallery image output with local files.
+- `circle_sketch/debug_gallery.py` can be used to test gallery image output with local files.
+
+## Testing
+- Run all tests with:
+  ```sh
+  pytest
+  ```
+- Test output images are saved in `tests/output/` for manual inspection.
 
 ## Development
 - Code is organized for clarity and maintainability.
