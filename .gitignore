@@ -33,3 +33,4 @@ ENV/
 # Misc
 bot/
 storage.sqlite3
+circle_sketch/prompts.py
