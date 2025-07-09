@@ -24,6 +24,18 @@ class Storage:
             id INTEGER PRIMARY KEY CHECK (id = 1),
             state TEXT
         )''')
+        # New: Table for per-user submission stats
+        c.execute('''CREATE TABLE IF NOT EXISTS user_stats (
+            user_id INTEGER PRIMARY KEY,
+            submissions INTEGER DEFAULT 0
+        )''')
+        # New: Table for group streak
+        c.execute('''CREATE TABLE IF NOT EXISTS group_streak (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            streak INTEGER DEFAULT 0
+        )''')
+        # Ensure group_streak row exists
+        c.execute('INSERT OR IGNORE INTO group_streak (id, streak) VALUES (1, 0)')
         conn.commit()
         conn.close()
 
@@ -78,6 +90,40 @@ class Storage:
         c = conn.cursor()
         c.execute('DELETE FROM player_circle')
         c.execute('DELETE FROM game_state')
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def get_user_stats():
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        c.execute('SELECT user_id, submissions FROM user_stats')
+        stats = {row['user_id']: row['submissions'] for row in c.fetchall()}
+        conn.close()
+        return stats
+
+    @staticmethod
+    def increment_user_submission(user_id):
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        c.execute('INSERT INTO user_stats (user_id, submissions) VALUES (?, 1) ON CONFLICT(user_id) DO UPDATE SET submissions = submissions + 1', (user_id,))
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def get_group_streak():
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        c.execute('SELECT streak FROM group_streak WHERE id=1')
+        row = c.fetchone()
+        conn.close()
+        return row['streak'] if row else 0
+
+    @staticmethod
+    def set_group_streak(streak):
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        c.execute('UPDATE group_streak SET streak=? WHERE id=1', (streak,))
         conn.commit()
         conn.close()
 

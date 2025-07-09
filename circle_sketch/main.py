@@ -13,6 +13,8 @@ import os
 import io
 from colorama import Fore, Style, init as colorama_init
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pytz
 
 colorama_init(autoreset=True)
 
@@ -28,6 +30,9 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 tree = bot.tree
 
 CIRCLE_LIMIT = 10
+
+# Set timezone for EST (New York)
+EST = pytz.timezone('America/New_York')
 
 def is_admin(interaction: Interaction):
     return interaction.user.guild_permissions.administrator
@@ -146,6 +151,18 @@ def log_error(msg):
     print(Fore.RED + Style.BRIGHT + f"[ERROR] {msg}" + Style.RESET_ALL)
 
 async def post_prompt_and_collect(channel, theme, date_str, user_ids):
+    # --- Streak and user stats announcement ---
+    streak = Storage.get_group_streak()
+    user_stats = Storage.get_user_stats()
+    if streak > 0:
+        streak_msg = f"**Your group is on a {streak} day streak!** 🔥 Here are yesterday's results:\n"
+        lines = []
+        for user_id in user_ids:
+            count = user_stats.get(user_id, 0)
+            lines.append(f"<@{user_id}>: {count}/{streak} drawings!")
+        streak_msg += "\n".join(lines)
+        await channel.send(streak_msg)
+    # --- End streak announcement ---
     img_bytes = make_theme_announcement_image(theme)
     file = discord.File(img_bytes, filename="theme.png")
     await channel.send(content="@everyone Today's game is starting!", file=file)
@@ -217,6 +234,19 @@ async def end_daily_game(channel):
     theme = state['theme']
     date_str = state['date']
     gallery = state.get('gallery', {})
+    # --- Streak and user stats logic ---
+    if gallery:
+        # Increment streak
+        streak = Storage.get_group_streak() + 1
+        Storage.set_group_streak(streak)
+        # Increment user stats
+        for user_id in gallery:
+            Storage.increment_user_submission(int(user_id))
+    else:
+        # Reset streak if no submissions
+        Storage.set_group_streak(0)
+        streak = 0
+    # --- End streak logic ---
     if not gallery:
         await channel.send(f"No submissions for today's theme: **{theme}**.")
         log_info("No submissions to reveal.")
@@ -260,7 +290,7 @@ if DEV_MODE:
 else:
     scheduled_mode_enabled = False
     manual_game_starter_id = None
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone=EST)
     async def start_daily_game():
         circle = Storage.get_player_circle()
         if len(circle) < 1:
@@ -273,8 +303,9 @@ else:
     async def end_game_job():
         channel = bot.get_channel(GAME_CHANNEL_ID)
         await end_daily_game(channel)
-    scheduler.add_job(lambda: asyncio.create_task(start_daily_game()), 'cron', hour=21, minute=0)
-    scheduler.add_job(lambda: asyncio.create_task(end_game_job()), 'cron', hour=21, minute=0, second=10)
+    # Schedule jobs for 5 PM EST
+    scheduler.add_job(lambda: asyncio.create_task(start_daily_game()), CronTrigger(hour=17, minute=0, timezone=EST))
+    scheduler.add_job(lambda: asyncio.create_task(end_game_job()), CronTrigger(hour=17, minute=0, second=10, timezone=EST))
     @tree.command(name="start_scheduled_game", description="Start daily scheduled game mode (5pm UTC)")
     async def start_scheduled_game(interaction: Interaction):
         global scheduled_mode_enabled
@@ -294,26 +325,27 @@ else:
         async def scheduled_end():
             channel = bot.get_channel(GAME_CHANNEL_ID)
             await end_daily_game(channel)
-        scheduler.add_job(lambda: asyncio.create_task(scheduled_start()), 'cron', hour=17, minute=0)
-        scheduler.add_job(lambda: asyncio.create_task(scheduled_end()), 'cron', hour=17, minute=0, second=10)
+        scheduler.add_job(lambda: asyncio.create_task(scheduled_start()), CronTrigger(hour=17, minute=0, timezone=EST))
+        scheduler.add_job(lambda: asyncio.create_task(scheduled_end()), CronTrigger(hour=17, minute=0, second=10, timezone=EST))
         await interaction.response.send_message("Scheduled game mode enabled. Daily games will start at 5pm UTC.", ephemeral=True)
         log_info(f"Scheduled game mode enabled by {interaction.user.id}")
     @tree.command(name="start_manual_game", description="Start a manual game (ends only when ended by the starter)")
     async def start_manual_game(interaction: Interaction):
         global manual_game_starter_id
+        await interaction.response.defer(ephemeral=True)
         if manual_game_starter_id is not None:
-            await interaction.response.send_message("A manual game is already running.", ephemeral=True)
+            await interaction.followup.send("A manual game is already running.", ephemeral=True)
             return
         manual_game_starter_id = interaction.user.id
         channel = bot.get_channel(GAME_CHANNEL_ID)
         circle = Storage.get_player_circle()
         if len(circle) < 1:
-            await interaction.response.send_message("Not enough players to start the game.", ephemeral=True)
+            await interaction.followup.send("Not enough players to start the game.", ephemeral=True)
             return
         theme = random.choice(PROMPT_LIST)
         date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
         await post_prompt_and_collect(channel, theme, date_str, circle)
-        await interaction.response.send_message("Manual game started. Use /end_manual_game to end.", ephemeral=True)
+        await interaction.followup.send("Manual game started. Use /end_manual_game to end.", ephemeral=True)
         log_info(f"Manual game started by {interaction.user.id}")
 
     @tree.command(name="end_manual_game", description="End the current manual game and post the gallery.")
