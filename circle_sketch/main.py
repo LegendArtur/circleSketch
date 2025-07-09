@@ -292,14 +292,31 @@ else:
     manual_game_starter_id = None
     scheduler = AsyncIOScheduler(timezone=EST)
     async def start_daily_game():
-        circle = Storage.get_player_circle()
-        if len(circle) < 1:
-            logging.info("Not enough players to start the game.")
+        # If first game not started, start immediately and set flag
+        if not Storage.get_first_game_started():
+            circle = Storage.get_player_circle()
+            if len(circle) < 1:
+                logging.info("Not enough players to start the game.")
+                return
+            theme = random.choice(PROMPT_LIST)
+            date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
+            channel = bot.get_channel(GAME_CHANNEL_ID)
+            await post_prompt_and_collect(channel, theme, date_str, circle)
+            Storage.set_first_game_started(True)
+            logging.info("First game started immediately after bot launch.")
             return
-        theme = random.choice(PROMPT_LIST)
-        date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
-        channel = bot.get_channel(GAME_CHANNEL_ID)
-        await post_prompt_and_collect(channel, theme, date_str, circle)
+        # Otherwise, only start at 5pm as scheduled
+        now = datetime.datetime.now(EST)
+        if now.hour == 17 and now.minute == 0:
+            circle = Storage.get_player_circle()
+            if len(circle) < 1:
+                logging.info("Not enough players to start the game.")
+                return
+            theme = random.choice(PROMPT_LIST)
+            date_str = datetime.datetime.now(datetime.timezone.utc).strftime('%B %d, %Y')
+            channel = bot.get_channel(GAME_CHANNEL_ID)
+            await post_prompt_and_collect(channel, theme, date_str, circle)
+            logging.info("Scheduled 5pm game started.")
     async def end_game_job():
         channel = bot.get_channel(GAME_CHANNEL_ID)
         await end_daily_game(channel)
