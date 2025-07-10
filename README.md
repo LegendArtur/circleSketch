@@ -14,15 +14,27 @@
 
 -----
 
+## Table of Contents
+
+- [Features](#features)
+- [Setup and Installation](#setup-and-installation)
+- [Bot Commands](#bot-commands)
+- [Customization](#customization)
+- [Database Backend Selection](#database-backend-selection)
+- [Contributing](#contributing)
+- [License](#license)
+
+-----
+
 ## Features
 
-🎨 **Daily Drawing Game:** Automatically posts new prompts and reveals galleries at a configurable time.
-🕹️ **Manual Game Mode:** Admins can start and end games on-demand with simple slash commands.
-🔄 **Persistent Player Circle:** Users can easily join or leave the game circle at any time.
-🖼️ **Dynamic Gallery Generation:** The bot collects submissions and generates themed gallery images for each player's art.
-📈 **Streak Tracking:** Motivates players by tracking both group participation streaks and individual user stats.
-🛡️ **Admin Controls:** Provides necessary tools for moderation, including resetting the player circle and checking game status.
-⚙️ **Production Ready:** Includes robust logging, graceful shutdown handling, and a modular, extensible codebase built with `discord.py` cogs.
+- 🎨 **Daily Drawing Game:** Automatically posts new prompts and reveals galleries at a configurable time.
+- 🕹️ **Manual Game Mode:** Admins can start and end games on-demand with simple slash commands.
+- 🔄 **Persistent Player Circle:** Users can easily join or leave the game circle at any time.
+- 🖼️ **Dynamic Gallery Generation:** The bot collects submissions and generates themed gallery images for each player's art.
+- 📈 **Streak Tracking:** Motivates players by tracking both group participation streaks and individual user stats.
+- 🛡️ **Admin Controls:** Provides necessary tools for moderation, including resetting the player circle and checking game status.
+- ⚙️ **Production Ready:** Includes robust logging, graceful shutdown handling, and a modular, extensible codebase built with `discord.py` cogs.
 
 -----
 
