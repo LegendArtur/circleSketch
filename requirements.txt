@@ -6,4 +6,4 @@ colorama
 requests
 pytest
 pytz
-mysql-connector-python # if using MySQL for database
+mysql-connector-python
