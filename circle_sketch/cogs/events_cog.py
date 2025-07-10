@@ -36,7 +36,6 @@ class EventsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_disconnect(self):
         log_warn("Bot disconnected from Discord gateway.")
-        log_success("Bot shutdown complete.")
 
     @commands.Cog.listener()
     async def on_ready(self):
