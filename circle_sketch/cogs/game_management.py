@@ -88,7 +88,7 @@ class GameManagement(commands.Cog):
             for user_id, img_url in gallery.items():
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                    img_bytes = await make_gallery_image(theme, date, user, img_url)
+                    img_bytes = make_gallery_image(theme, date, user, img_url)
                     file = discord.File(img_bytes, filename=f"gallery_{user_id}.png")
                     await channel.send(file=file)
                 except Exception as e:
