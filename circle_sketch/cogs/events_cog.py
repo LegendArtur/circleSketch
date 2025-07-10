@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 from discord import Message
-from ..storage.storage_sqlite import Storage
+from ..storage.storage import Storage
 from ..gallery.gallery import make_gallery_image
 from ..config import GAME_CHANNEL_ID
 from ..main import log_info, log_warn, log_error, log_success

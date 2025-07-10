@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands, Interaction
 from discord.ext import commands
-from ..storage.storage_sqlite import Storage
+from ..storage.storage import Storage
 from ..config import CIRCLE_LIMIT, GAME_CHANNEL_ID
 from ..gallery.gallery import make_gallery_image, make_theme_announcement_image
 from ..prompts import PROMPT_LIST
