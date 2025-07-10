@@ -3,53 +3,62 @@
 import sqlite3
 import json
 import os
+import sys
 
 DB_PATH = os.path.join(os.path.dirname(__file__), '..', '..', 'storage.sqlite3')
 
 class Storage:
     @staticmethod
     def _get_conn():
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            return conn
+        except Exception as e:
+            print(f"[FATAL] Could not connect to SQLite: {e}", file=sys.stderr)
+            sys.exit(1)
 
     @staticmethod
     def init():
-        conn = Storage._get_conn()
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS player_circle (
-            user_id INTEGER PRIMARY KEY
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS game_state (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            state TEXT
-        )''')
-        # New: Table for per-user submission stats
-        c.execute('''CREATE TABLE IF NOT EXISTS user_stats (
-            user_id INTEGER PRIMARY KEY,
-            submissions INTEGER DEFAULT 0
-        )''')
-        # New: Table for group streak
-        c.execute('''CREATE TABLE IF NOT EXISTS group_streak (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            streak INTEGER DEFAULT 0
-        )''')
-        # New: Table for first_game_started flag
-        c.execute('''CREATE TABLE IF NOT EXISTS bot_flags (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )''')
-        # New: Table for per-user streaks
-        c.execute('''CREATE TABLE IF NOT EXISTS user_streaks (
-            user_id INTEGER PRIMARY KEY,
-            streak INTEGER DEFAULT 0
-        )''')
-        # Ensure group_streak row exists
-        c.execute('INSERT OR IGNORE INTO group_streak (id, streak) VALUES (1, 0)')
-        # Ensure first_game_started flag exists
-        c.execute('INSERT OR IGNORE INTO bot_flags (key, value) VALUES ("first_game_started", "0")')
-        conn.commit()
-        conn.close()
+        try:
+            conn = Storage._get_conn()
+            c = conn.cursor()
+            c.execute('''CREATE TABLE IF NOT EXISTS player_circle (
+                user_id INTEGER PRIMARY KEY
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS game_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                state TEXT
+            )''')
+            # New: Table for per-user submission stats
+            c.execute('''CREATE TABLE IF NOT EXISTS user_stats (
+                user_id INTEGER PRIMARY KEY,
+                submissions INTEGER DEFAULT 0
+            )''')
+            # New: Table for group streak
+            c.execute('''CREATE TABLE IF NOT EXISTS group_streak (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                streak INTEGER DEFAULT 0
+            )''')
+            # New: Table for first_game_started flag
+            c.execute('''CREATE TABLE IF NOT EXISTS bot_flags (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )''')
+            # New: Table for per-user streaks
+            c.execute('''CREATE TABLE IF NOT EXISTS user_streaks (
+                user_id INTEGER PRIMARY KEY,
+                streak INTEGER DEFAULT 0
+            )''')
+            # Ensure group_streak row exists
+            c.execute('INSERT OR IGNORE INTO group_streak (id, streak) VALUES (1, 0)')
+            # Ensure first_game_started flag exists
+            c.execute('INSERT OR IGNORE INTO bot_flags (key, value) VALUES ("first_game_started", "0")')
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[FATAL] SQLite init failed: {e}", file=sys.stderr)
+            sys.exit(1)
 
     @staticmethod
     def get_player_circle():

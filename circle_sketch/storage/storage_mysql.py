@@ -3,6 +3,7 @@
 import mysql.connector
 import json
 import os
+import sys
 
 MYSQL_URL = os.environ.get("CIRCLE_SKETCH_MYSQL_URL")
 if not MYSQL_URL:
@@ -18,47 +19,55 @@ MYSQL_USER, MYSQL_PASS, MYSQL_HOST, MYSQL_DB = m.groups()
 class MySQLStorage:
     @staticmethod
     def _get_conn():
-        return mysql.connector.connect(
-            host=MYSQL_HOST,
-            user=MYSQL_USER,
-            password=MYSQL_PASS,
-            database=MYSQL_DB,
-            autocommit=True
-        )
+        try:
+            return mysql.connector.connect(
+                host=MYSQL_HOST,
+                user=MYSQL_USER,
+                password=MYSQL_PASS,
+                database=MYSQL_DB,
+                autocommit=True
+            )
+        except Exception as e:
+            print(f"[FATAL] Could not connect to MySQL: {e}", file=sys.stderr)
+            sys.exit(1)
 
     @staticmethod
     def init():
-        conn = MySQLStorage._get_conn()
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS player_circle (
-            user_id BIGINT,
-            guild_id BIGINT,
-            PRIMARY KEY (user_id, guild_id)
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS game_state (
-            id INT PRIMARY KEY,
-            state TEXT
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS user_stats (
-            user_id BIGINT PRIMARY KEY,
-            submissions INT DEFAULT 0
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS group_streak (
-            id INT PRIMARY KEY,
-            streak INT DEFAULT 0
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS bot_flags (
-            `key` VARCHAR(64) PRIMARY KEY,
-            value VARCHAR(64)
-        )''')
-        c.execute('''CREATE TABLE IF NOT EXISTS user_streaks (
-            user_id BIGINT PRIMARY KEY,
-            streak INT DEFAULT 0
-        )''')
-        c.execute('INSERT IGNORE INTO group_streak (id, streak) VALUES (1, 0)')
-        c.execute('INSERT IGNORE INTO bot_flags (`key`, value) VALUES ("first_game_started", "0")')
-        conn.commit()
-        conn.close()
+        try:
+            conn = MySQLStorage._get_conn()
+            c = conn.cursor()
+            c.execute('''CREATE TABLE IF NOT EXISTS player_circle (
+                user_id BIGINT,
+                guild_id BIGINT,
+                PRIMARY KEY (user_id, guild_id)
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS game_state (
+                id INT PRIMARY KEY,
+                state TEXT
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS user_stats (
+                user_id BIGINT PRIMARY KEY,
+                submissions INT DEFAULT 0
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS group_streak (
+                id INT PRIMARY KEY,
+                streak INT DEFAULT 0
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS bot_flags (
+                `key` VARCHAR(64) PRIMARY KEY,
+                value VARCHAR(64)
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS user_streaks (
+                user_id BIGINT PRIMARY KEY,
+                streak INT DEFAULT 0
+            )''')
+            c.execute('INSERT IGNORE INTO group_streak (id, streak) VALUES (1, 0)')
+            c.execute('INSERT IGNORE INTO bot_flags (`key`, value) VALUES ("first_game_started", "0")')
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"[FATAL] MySQL init failed: {e}", file=sys.stderr)
+            sys.exit(1)
 
     @staticmethod
     def get_player_circle(guild_id=None):
