@@ -86,7 +86,22 @@ async def load_cogs(bot):
     await bot.load_extension("circle_sketch.cogs.game_management")
     await bot.load_extension("circle_sketch.cogs.events_cog")
 
+def log_startup_settings():
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    log_info("--- CircleSketch Startup Settings ---")
+    log_info(f"DISCORD_TOKEN: {'set' if os.getenv('DISCORD_TOKEN') else 'NOT SET'}")
+    log_info(f"GAME_CHANNEL_ID: {os.getenv('GAME_CHANNEL_ID')}")
+    log_info(f"LOG_FILE: {os.getenv('LOG_FILE', 'not set')}")
+    log_info(f"SCHEDULED_GAME_TIME: {os.getenv('SCHEDULED_GAME_TIME', '17:00')}")
+    log_info(f"CIRCLE_SKETCH_DB_BACKEND: {os.getenv('CIRCLE_SKETCH_DB_BACKEND', 'sqlite')}")
+    if os.getenv('CIRCLE_SKETCH_DB_BACKEND', 'sqlite').lower() == 'mysql':
+        log_info(f"CIRCLE_SKETCH_MYSQL_URL: {os.getenv('CIRCLE_SKETCH_MYSQL_URL', 'not set')}")
+    log_info("-------------------------------------")
+
 def main():
+    log_startup_settings()
     signal.signal(signal.SIGINT, handle_sigint)
     threading.Thread(target=console_control, daemon=True).start()
     asyncio.run(run_bot())
