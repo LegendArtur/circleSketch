@@ -30,7 +30,9 @@ class GameManagement(commands.Cog):
     @app_commands.command(name="start_manual_game", description="Start a manual game (ends only when ended by the starter)")
     async def start_manual_game(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        if getattr(self, 'manual_game_starter_id', None) is not None:
+        state = Storage.get_game_state()
+        # If either manual_game_starter_id or state indicates a game, block start
+        if self.manual_game_starter_id is not None or (state and 'theme' in state):
             await interaction.followup.send("A manual game is already running.", ephemeral=True)
             return
         self.manual_game_starter_id = interaction.user.id
@@ -42,11 +44,9 @@ class GameManagement(commands.Cog):
         today = datetime.datetime.now().strftime('%Y-%m-%d')
         Storage.set_game_state({'theme': prompt, 'date': today, 'user_ids': circle, 'submissions': {}, 'gallery': {}})
         channel = self.bot.get_channel(GAME_CHANNEL_ID)
-        # Post theme announcement image in channel
         img_bytes = make_theme_announcement_image(prompt)
         file = discord.File(img_bytes, filename="theme.png")
         await channel.send(content="@everyone Today's game is starting!", file=file)
-        # DM text only to each user        
         for user_id in circle:
             try:
                 user = await self.bot.fetch_user(user_id)
@@ -98,16 +98,15 @@ class GameManagement(commands.Cog):
     @app_commands.command(name="end_manual_game", description="End the current manual game and post the gallery.")
     async def end_manual_game(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        if getattr(self, 'manual_game_starter_id', None) is None:
-            await interaction.followup.send("No manual game is running.", ephemeral=True)
+        state = Storage.get_game_state()
+        # If either manual_game_starter_id or state is missing, treat as no game
+        if self.manual_game_starter_id is None or not (state and 'theme' in state):
+            self.manual_game_starter_id = None
+            Storage.set_game_state({})
+            await interaction.followup.send("No manual game is currently running.", ephemeral=True)
             return
         if interaction.user.id != self.manual_game_starter_id and not is_admin(interaction):
             await interaction.followup.send("Only the game starter or an admin can end the game.", ephemeral=True)
-            return
-        state = Storage.get_game_state()
-        if not state or 'theme' not in state:
-            await interaction.followup.send("No game is currently running.", ephemeral=True)
-            self.manual_game_starter_id = None
             return
         channel = self.bot.get_channel(GAME_CHANNEL_ID)
         await self.end_game_phase(channel, state)
