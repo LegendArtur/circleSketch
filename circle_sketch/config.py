@@ -10,6 +10,7 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GAME_CHANNEL_ID = int(os.getenv('GAME_CHANNEL_ID', 0))
 SCHEDULED_GAME_TIME = os.getenv('SCHEDULED_GAME_TIME', '20:00')
+CIRCLE_LIMIT = 10
 
 # Setup rotating file logging for production
 log_file = os.getenv('LOG_FILE', 'bot.log')
