@@ -1,90 +1,125 @@
-# CircleSketch
+# CircleSketch Discord Bot
 
-CircleSketch is a robust, production-ready Discord bot for running daily asynchronous art games. Players join a persistent circle, receive drawing prompts, submit their artwork via DM, and enjoy a polished gallery reveal. The bot supports scheduled, manual, and developer game modes, with reliable player management, persistent storage, and beautiful image generation for both prompts and galleries.
+\<p align="center"\>
+\<img src="[https://img.shields.io/badge/python-3.10+-blue.svg](https://www.google.com/search?q=https://img.shields.io/badge/python-3.10%2B-blue.svg)" alt="Python Version"\>
+\<img src="[https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg](https://www.google.com/search?q=https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg)" alt="discord.py"\>
+\<img src="[https://img.shields.io/badge/License-MIT-yellow.svg](https://www.google.com/search?q=https://img.shields.io/badge/License-MIT-yellow.svg)" alt="License: MIT"\>
+\</p\>
+
+\<p align="center"\>
+A collaborative daily drawing game for Discord.
+\</p\>
+
+**CircleSketch** is a robust Discord bot that hosts a daily drawing game. Players join a persistent circle to receive daily prompts, submit their art directly to the bot, and see a gallery of everyone's work at the end of the day. The bot is designed for 24/7 hosting, featuring streak tracking, admin controls, and a clean, modular codebase.
+
+-----
 
 ## Features
-- Persistent player management with join/leave/list/reset commands
-- Daily, manual, and developer game modes
-- Scheduled games (via APScheduler)
-- DM-based image submission and reminders
-- Gallery and theme announcement image generation (Pillow)
-- Robust, concurrent-safe storage (SQLite)
-- Clear, colorized logging (colorama)
-- Debug/test scripts for gallery output
-- Full test suite with pytest
 
-## Setup
-1. **Clone the repository**
-2. **Install dependencies**
-   ```sh
-   pip install -r requirements.txt
-   ```
-3. **Configure environment variables**
-   - Copy `.env.example` to `.env` and fill in your Discord bot token and channel ID.
-   - Or set `DISCORD_TOKEN` and `GAME_CHANNEL_ID` as environment variables.
-4. **Run the bot**
-   - **Recommended:**
-     ```sh
-     python -m circle_sketch.main
-     ```
-   - **If your host does not support `-m` (e.g., some shared hosts):**
-     ```sh
-     python run_bot.py
-     ```
+🎨 **Daily Drawing Game:** Automatically posts new prompts and reveals galleries at a configurable time.
+🕹️ **Manual Game Mode:** Admins can start and end games on-demand with simple slash commands.
+🔄 **Persistent Player Circle:** Users can easily join or leave the game circle at any time.
+🖼️ **Dynamic Gallery Generation:** The bot collects submissions and generates themed gallery images for each player's art.
+📈 **Streak Tracking:** Motivates players by tracking both group participation streaks and individual user stats.
+🛡️ **Admin Controls:** Provides necessary tools for moderation, including resetting the player circle and checking game status.
+⚙️ **Production Ready:** Includes robust logging, graceful shutdown handling, and a modular, extensible codebase built with `discord.py` cogs.
 
-## Production & Hosting
-- The bot writes logs to both the console and a rotating file (`bot.log` by default).
-- You can control the bot from the console with commands: `stop`, `status`, `help`.
-- For 24/7 hosting, use a process manager (e.g., `screen`, `tmux`, or your host's panel).
-- See `run_bot.py` for alternate launch instructions if needed.
+-----
 
-## Configuration
-- `circle_sketch/config.py`: Set up your Discord token, game channel, and other settings.
-- `.env`: Store sensitive credentials (not committed to git).
+## Setup and Installation
 
-## Commands
-- `/join_circle` — Join the persistent player circle
-- `/leave_circle` — Leave the circle
-- `/list_circle` — List current circle members
-- `/reset_circle` — [Admin] Reset the player circle
-- `/start_scheduled_game` — Start daily scheduled games (5pm UTC)
-- `/start_manual_game` — Start a manual game (ends manually)
-- `/end_manual_game` — End a manual game
-- `/dev_start_game` — [Dev] Start a single-user test game
+### Prerequisites
 
-## Game Flow
-1. Players join the circle
-2. At scheduled/manual/dev start, a theme is announced in the channel (with image)
-3. Each player receives a DM prompt and submits their drawing as an image
-4. Submissions are collected and announced in the channel
-5. At the end, a gallery image is generated and posted
+  * Python 3.10+
+  * Git
 
-## Storage
-- All persistent data (player circle, game state) is stored in `circle_sketch/storage.sqlite3` via `sqlite3`.
-- No JSON files or in-memory state; safe for concurrent/multi-process use.
+### 1\. Clone the Repository
 
-## Gallery Generation
-- Uses Pillow to generate composite images for both theme announcements and gallery reveals.
-- User avatars and drawing images are fetched and composed with dynamic sizing, colored borders, and bundled fonts for portability.
+```bash
+git clone https://github.com/your-username/CircleSketch.git
+cd CircleSketch
+```
 
-## Debugging
-- `circle_sketch/debug_gallery.py` can be used to test gallery image output with local files.
+### 2\. Install Dependencies
 
-## Testing
-- Run all tests with:
-  ```sh
-  pytest
-  ```
-- Test output images are saved in `tests/output/` for manual inspection.
+```bash
+pip install -r requirements.txt
+```
 
-## Development
-- Code is organized for clarity and maintainability.
-- Logging is colorized for easy terminal reading.
-- All major error sources are handled robustly.
+### 3\. Create Your Prompt List
+
+The bot uses a simple Python list for its drawing prompts. To keep your list private, it is not tracked by Git.
+
+1.  **Copy the example file:**
+
+    ```bash
+    cp circle_sketch/prompts.example.py circle_sketch/prompts.py
+    ```
+
+2.  **Edit `circle_sketch/prompts.py`** and add your own list of prompts.
+
+    *Example `prompts.py`*:
+
+    ```python
+    # This list contains the drawing prompts for the bot.
+    PROMPT_LIST = [
+        "A happy cat wearing a top hat",
+        "A robot chef making pancakes",
+        "A majestic dragon flying over a futuristic city",
+    ]
+    ```
+
+### 4\. Configure Environment Variables
+
+Create a `.env` file in the root directory of the project to store your bot's credentials and configuration.
+
+```env
+# .env
+DISCORD_TOKEN=your-super-secret-bot-token
+GAME_CHANNEL_ID=your-game-channel-id
+
+# Optional: Override default settings
+# LOG_FILE=logs/bot.log
+# SCHEDULED_GAME_TIME=17:00
+```
+
+### 5\. Run the Bot
+
+```bash
+python run_bot.py
+```
+
+-----
+
+## Bot Commands
+
+| Command                 | Description                                                  | Permissions |
+| ----------------------- | ------------------------------------------------------------ | ----------- |
+| `/join_circle`          | Join the player circle to participate in games.              | All Users   |
+| `/leave_circle`         | Leave the player circle.                                     | All Users   |
+| `/list_circle`          | Lists all current members of the player circle.              | All Users   |
+| `/show_streaks`         | Displays the current group streak and individual stats.      | All Users   |
+| `/game_status`          | Shows the status of the current game, including the theme.   | All Users   |
+| `/start_manual_game`    | Manually starts a new game that runs until ended.            | All Users   |
+| `/end_manual_game`      | Ends the current manual game and posts the gallery.          | Game Starter or Admin |
+| `/reset_circle`         | **[Admin]** Resets the player circle, removing all members.  | Admin Only  |
+
+-----
+
+## Customization
+
+  * **Prompts:** Keep your prompt list unique and private by editing only your local `prompts.py`.
+  * **Assets:** Place custom fonts in `assets/fonts/` to change the look of the generated gallery images.
+  * **Configuration:** Most core settings (like game time) can be adjusted in your `.env` file or directly in `circle_sketch/config.py`.
+
+-----
+
+## Contributing
+
+Contributions are welcome\! Please feel free to fork the repository, create a new branch, and submit a pull request. When contributing, please do not commit your personal `prompts.py` file.
+
+-----
 
 ## License
-MIT License
 
----
-
-*Built with ❤️ for asynchronous art games on Discord.*
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/LegendArtur/circleSketch/blob/main/LICENSE) file for details.

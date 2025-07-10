@@ -7,4 +7,11 @@ Usage:
 - This will import and execute the bot from circle_sketch/main.py, allowing relative imports to work.
 """
 
-from circle_sketch.main import *
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+from circle_sketch.main import main
+
+if __name__ == "__main__":
+    main()
