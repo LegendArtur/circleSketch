@@ -3,6 +3,7 @@ from discord.ext import commands
 import threading
 import asyncio
 import os
+import signal
 from .config import DISCORD_TOKEN
 from colorama import Fore, Style, init as colorama_init
 
@@ -28,16 +29,23 @@ def create_bot():
 
 bot = create_bot()
 
+shutdown_event = threading.Event()
+
 def console_control():
     while True:
         cmd = input()
         if cmd.strip().lower() == "stop":
             print("Shutting down bot...")
-            os._exit(0)
+            shutdown_event.set()
+            break
         elif cmd.strip().lower() == "status":
             print("Bot is running.")
         elif cmd.strip().lower() == "help":
             print("Available commands: stop, status, help")
+
+def handle_sigint(sig, frame):
+    print("\nReceived Ctrl+C, shutting down bot gracefully...")
+    shutdown_event.set()
 
 async def load_cogs(bot):
     await bot.load_extension("circle_sketch.cogs.circle_management")
@@ -45,8 +53,18 @@ async def load_cogs(bot):
     await bot.load_extension("circle_sketch.cogs.events_cog")
 
 def main():
+    signal.signal(signal.SIGINT, handle_sigint)
     threading.Thread(target=console_control, daemon=True).start()
-    asyncio.run(load_cogs(bot))
-    bot.run(DISCORD_TOKEN)
+    asyncio.run(run_bot())
+
+def run_bot():
+    async def runner():
+        await load_cogs(bot)
+        bot_task = asyncio.create_task(bot.start(DISCORD_TOKEN))
+        while not shutdown_event.is_set():
+            await asyncio.sleep(0.2)
+        await bot.close()
+        log_success("Bot shutdown complete.")
+    return runner()
 
 main()
