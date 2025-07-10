@@ -1,14 +1,12 @@
 # CircleSketch Discord Bot
 
-\<p align="center"\>
-\<img src="[https://img.shields.io/badge/python-3.10+-blue.svg](https://www.google.com/search?q=https://img.shields.io/badge/python-3.10%2B-blue.svg)" alt="Python Version"\>
-\<img src="[https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg](https://www.google.com/search?q=https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg)" alt="discord.py"\>
-\<img src="[https://img.shields.io/badge/License-MIT-yellow.svg](https://www.google.com/search?q=https://img.shields.io/badge/License-MIT-yellow.svg)" alt="License: MIT"\>
-\</p\>
+![Python Version](https://img.shields.io/badge/python-3.10+-blue.svg)
+![discord.py](https://img.shields.io/badge/discord.py-2.3.2-7289DA.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-\<p align="center"\>
-A collaborative daily drawing game for Discord.
-\</p\>
+<p align="center">
+  A collaborative daily drawing game for Discord.
+</p>
 
 **CircleSketch** is a robust Discord bot that hosts a daily drawing game. Players join a persistent circle to receive daily prompts, submit their art directly to the bot, and see a gallery of everyone's work at the end of the day. The bot is designed for 24/7 hosting, featuring streak tracking, admin controls, and a clean, modular codebase.
 
