@@ -8,6 +8,10 @@ from ..prompts import PROMPT_LIST
 import random
 import datetime
 
+# --- Admin Check ---
+def is_admin(interaction: Interaction):
+    return interaction.user.guild_permissions.administrator
+
 class CircleManagement(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -68,6 +72,35 @@ class CircleManagement(commands.Cog):
             else:
                 members.append(f"<@{user_id}>")
         await interaction.followup.send(f"Current Players ({len(circle)}/{CIRCLE_LIMIT}): {', '.join(members)}", ephemeral=True)
+
+    @app_commands.command(name="reset_circle", description="[Admin] Reset the player circle.")
+    @app_commands.check(is_admin)
+    async def reset_circle(self, interaction: Interaction):
+        class Confirm(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=30)
+                self.value = None
+            @discord.ui.button(label="Yes. I am sure.", style=discord.ButtonStyle.danger)
+            async def confirm(self, interaction2: Interaction, button: discord.ui.Button):
+                Storage.set_player_circle([])
+                await interaction2.response.edit_message(content="Player circle has been reset.", view=None)
+                self.value = True
+                self.stop()
+            async def on_timeout(self):
+                for item in self.children:
+                    item.disabled = True
+                try:
+                    await self.message.edit(content="Reset cancelled (no confirmation received).", view=None)
+                except Exception:
+                    pass
+        view = Confirm()
+        msg = await interaction.response.send_message("Are you sure you want to reset the player circle?", ephemeral=True, view=view)
+        view.message = msg
+
+    @reset_circle.error
+    async def reset_circle_error(self, interaction: Interaction, error):
+        if isinstance(error, app_commands.errors.CheckFailure):
+            await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(CircleManagement(bot))

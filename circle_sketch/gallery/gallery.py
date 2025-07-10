@@ -80,7 +80,7 @@ def make_gallery_image(theme, date_str, user: discord.User, drawing_url):
     return out
 
 def make_theme_announcement_image(theme: str):
-    width, height = 700, 300
+    width, height = 1000, 300
     bg = Image.new("RGBA", (width, height), (30, 30, 40, 255))
     draw = ImageDraw.Draw(bg)
     # Use bundled font
