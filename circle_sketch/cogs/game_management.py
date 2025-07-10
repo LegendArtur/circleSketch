@@ -83,8 +83,8 @@ class GameManagement(commands.Cog):
                     Storage.set_user_streak(user_id, 0)
                     user_streaks[user_id] = 0
             # Compose streak summary
-            streak_lines = [f"<@{uid}>: {user_streaks[uid]}" for uid in user_streaks]
-            await channel.send(f"Gallery for '**{theme}**' - {date}! Current group streak: {streak + 1}\nUser streaks:\n" + "\n".join(streak_lines))
+            streak_lines = [f"<@{uid}>: {user_streaks[uid]}🔥" if user_streaks[uid] > 0 else f"<@{uid}>: 0" for uid in user_streaks]
+            await channel.send(f"Gallery for '**{theme}**' - {date}! Current group streak: {streak + 1} 🔥\nUser streaks:\n" + "\n".join(streak_lines))
             for user_id, img_url in gallery.items():
                 try:
                     user = await self.bot.fetch_user(int(user_id))
@@ -143,12 +143,12 @@ class GameManagement(commands.Cog):
                 if not rows:
                     await interaction.followup.send(f"Current group streak: {group_streak}\nNo user streaks found.", ephemeral=True)
                     return
-                streak_lines = [f"<@{row['user_id']}>: {row['streak']}" for row in rows]
+                streak_lines = [f"<@{row['user_id']}>: {row['streak']}🔥" if row['streak'] > 0 else f"<@{row['user_id']}>: 0" for row in rows]
             except Exception:
                 streak_lines = []
         else:
-            streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)}" for uid in user_ids]
-        await interaction.followup.send(f"Current group streak: {group_streak}\nUser streaks:\n" + "\n".join(streak_lines), ephemeral=True)
+            streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)}🔥" if Storage.get_user_streak(uid) > 0 else f"<@{uid}>: 0" for uid in user_ids]
+        await interaction.followup.send(f"Current group streak: {group_streak} 🔥\n\nUser streaks:\n" + "\n".join(streak_lines), ephemeral=True)
 
     async def scheduled_start_game(self):
         circle = Storage.get_player_circle()
