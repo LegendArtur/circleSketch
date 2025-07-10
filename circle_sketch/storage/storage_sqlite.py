@@ -77,7 +77,11 @@ class Storage:
         row = c.fetchone()
         conn.close()
         if row and row['state']:
-            return json.loads(row['state'])
+            state = json.loads(row['state'])
+            # Ensure manual_game_starter_id is present for compatibility
+            if 'manual_game_starter_id' not in state:
+                state['manual_game_starter_id'] = None
+            return state
         return None
 
     @staticmethod
@@ -86,6 +90,9 @@ class Storage:
         c = conn.cursor()
         c.execute('DELETE FROM game_state')
         if state is not None:
+            # Always include manual_game_starter_id for persistence
+            if 'manual_game_starter_id' not in state:
+                state['manual_game_starter_id'] = None
             c.execute('INSERT INTO game_state (id, state) VALUES (1, ?)', (json.dumps(state),))
         conn.commit()
         conn.close()

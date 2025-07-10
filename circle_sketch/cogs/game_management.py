@@ -10,6 +10,9 @@ from apscheduler.triggers.cron import CronTrigger
 import pytz
 import random
 import datetime
+import os
+import shutil
+import io
 
 EST = pytz.timezone('America/New_York')
 
@@ -17,10 +20,29 @@ EST = pytz.timezone('America/New_York')
 def is_admin(interaction: Interaction):
     return interaction.user.guild_permissions.administrator
 
+IMAGE_STORAGE_DIR = os.path.join(os.path.dirname(__file__), '..', 'gallery', 'submissions')
+os.makedirs(IMAGE_STORAGE_DIR, exist_ok=True)
+
+def save_submission_image(user_id, img_url):
+    import requests
+    ext = os.path.splitext(img_url)[-1].split('?')[0] or '.png'
+    local_path = os.path.join(IMAGE_STORAGE_DIR, f"{user_id}{ext}")
+    r = requests.get(img_url, stream=True)
+    with open(local_path, 'wb') as f:
+        shutil.copyfileobj(r.raw, f)
+    return local_path
+
+def clear_submission_images(user_ids):
+    for user_id in user_ids:
+        for ext in ['.png', '.jpg', '.jpeg', '.webp']:
+            try:
+                os.remove(os.path.join(IMAGE_STORAGE_DIR, f"{user_id}{ext}"))
+            except FileNotFoundError:
+                pass
+
 class GameManagement(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.manual_game_starter_id = None
         self.scheduler = AsyncIOScheduler(timezone=EST)
         # End game at 5:00 PM, then start new game at 5:00:10 PM
         self.scheduler.add_job(self.scheduled_end_game, CronTrigger(hour=17, minute=0, timezone=EST))
@@ -30,19 +52,27 @@ class GameManagement(commands.Cog):
     @app_commands.command(name="start_manual_game", description="Start a manual game (ends only when ended by the starter)")
     async def start_manual_game(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        state = Storage.get_game_state()
-        # If either manual_game_starter_id or state indicates a game, block start
-        if self.manual_game_starter_id is not None or (state and 'theme' in state):
+        state = Storage.get_game_state() or {}
+        # If a game is running, block start
+        if state.get('theme') and state.get('manual_game_starter_id'):
             await interaction.followup.send("A manual game is already running.", ephemeral=True)
             return
-        self.manual_game_starter_id = interaction.user.id
         circle = Storage.get_player_circle()
         if len(circle) < 1:
             await interaction.followup.send("Not enough players to start the game.", ephemeral=True)
             return
         prompt = random.choice(PROMPT_LIST)
         today = datetime.datetime.now().strftime('%Y-%m-%d')
-        Storage.set_game_state({'theme': prompt, 'date': today, 'user_ids': circle, 'submissions': {}, 'gallery': {}})
+        new_state = {
+            'theme': prompt,
+            'date': today,
+            'user_ids': circle,
+            'submissions': {},
+            'gallery': {},
+            'manual_game_starter_id': interaction.user.id,
+            'guild_id': interaction.guild.id
+        }
+        Storage.set_game_state(new_state)
         channel = self.bot.get_channel(GAME_CHANNEL_ID)
         img_bytes = make_theme_announcement_image(prompt)
         file = discord.File(img_bytes, filename="theme.png")
@@ -60,7 +90,6 @@ class GameManagement(commands.Cog):
         date = state.get('date', 'unknown')
         gallery = state.get('gallery', {})
         streak = Storage.get_group_streak()
-        # Per-user streaks
         user_streaks = {}
         if not gallery:
             await channel.send(f"No submissions for today's theme: **{theme}**. The streak has ended at {streak}.")
@@ -85,32 +114,35 @@ class GameManagement(commands.Cog):
             # Compose streak summary
             streak_lines = [f"<@{uid}>: {user_streaks[uid]}🔥" if user_streaks[uid] > 0 else f"<@{uid}>: 0" for uid in user_streaks]
             await channel.send(f"Gallery for '**{theme}**' - {date}! Current group streak: {streak + 1} 🔥\nUser streaks:\n" + "\n".join(streak_lines))
-            for user_id, img_url in gallery.items():
+            for user_id, img_path in gallery.items():
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                    img_bytes = make_gallery_image(theme, date, user, img_url)
-                    file = discord.File(img_bytes, filename=f"gallery_{user_id}.png")
+                    # Use local image path for gallery
+                    with open(img_path, 'rb') as f:
+                        img_bytes = f.read()
+                    file = discord.File(io.BytesIO(img_bytes), filename=f"gallery_{user_id}.png")
                     await channel.send(file=file)
                 except Exception as e:
                     await channel.send(f"Failed to generate gallery image for <@{user_id}>: {e}")
+            # Clean up local images
+            clear_submission_images(gallery.keys())
         Storage.set_game_state({})
 
     @app_commands.command(name="end_manual_game", description="End the current manual game and post the gallery.")
     async def end_manual_game(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        state = Storage.get_game_state()
-        # If either manual_game_starter_id or state is missing, treat as no game
-        if self.manual_game_starter_id is None or not (state and 'theme' in state):
-            self.manual_game_starter_id = None
+        state = Storage.get_game_state() or {}
+        starter_id = state.get('manual_game_starter_id')
+        if not (state.get('theme') and starter_id):
             Storage.set_game_state({})
             await interaction.followup.send("No manual game is currently running.", ephemeral=True)
             return
-        if interaction.user.id != self.manual_game_starter_id and not is_admin(interaction):
+        if interaction.user.id != starter_id and not is_admin(interaction):
             await interaction.followup.send("Only the game starter or an admin can end the game.", ephemeral=True)
             return
         channel = self.bot.get_channel(GAME_CHANNEL_ID)
         await self.end_game_phase(channel, state)
-        self.manual_game_starter_id = None
+        Storage.set_game_state({})
         await interaction.followup.send("Manual game ended and gallery posted.", ephemeral=True)
 
     @app_commands.command(name="game_status", description="Show the current game status.")
