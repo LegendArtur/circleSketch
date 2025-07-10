@@ -24,20 +24,38 @@ DEV_USER_ID = int(os.getenv('DEV_USER_ID', '269634149726289930'))
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 
-intents = discord.Intents.default()
-intents.members = True
-intents.messages = True
-bot = commands.Bot(command_prefix="/", intents=intents)
+# --- Bot Setup ---
+def create_bot():
+    intents = discord.Intents.default()
+    intents.members = True
+    intents.messages = True
+    bot = commands.Bot(command_prefix="/", intents=intents)
+    return bot
+
+bot = create_bot()
 tree = bot.tree
 
 CIRCLE_LIMIT = 10
-
-# Set timezone for EST (New York)
 EST = pytz.timezone('America/New_York')
 
+# --- Logging Helpers ---
+def log_info(msg):
+    print(Fore.CYAN + Style.BRIGHT + f"[INFO] {msg}" + Style.RESET_ALL)
+
+def log_success(msg):
+    print(Fore.GREEN + Style.BRIGHT + f"[SUCCESS] {msg}" + Style.RESET_ALL)
+
+def log_warn(msg):
+    print(Fore.YELLOW + Style.BRIGHT + f"[WARN] {msg}" + Style.RESET_ALL)
+
+def log_error(msg):
+    print(Fore.RED + Style.BRIGHT + f"[ERROR] {msg}" + Style.RESET_ALL)
+
+# --- Admin Check ---
 def is_admin(interaction: Interaction):
     return interaction.user.guild_permissions.administrator
 
+# --- Command Definitions ---
 @tree.command(name="join_circle", description="Join the persistent player circle.")
 async def join_circle(interaction: Interaction):
     await interaction.response.defer(ephemeral=True)
@@ -139,18 +157,7 @@ async def reset_circle_error(interaction: Interaction, error):
         await interaction.response.send_message("You do not have permission to use this command.", ephemeral=True)
         logging.warning(f"User {interaction.user.id} tried to reset the circle without permission.")
 
-def log_info(msg):
-    print(Fore.CYAN + Style.BRIGHT + f"[INFO] {msg}" + Style.RESET_ALL)
-
-def log_success(msg):
-    print(Fore.GREEN + Style.BRIGHT + f"[SUCCESS] {msg}" + Style.RESET_ALL)
-
-def log_warn(msg):
-    print(Fore.YELLOW + Style.BRIGHT + f"[WARN] {msg}" + Style.RESET_ALL)
-
-def log_error(msg):
-    print(Fore.RED + Style.BRIGHT + f"[ERROR] {msg}" + Style.RESET_ALL)
-
+# --- Game Logic Functions ---
 async def post_prompt_and_collect(channel, theme, date_str, user_ids):
     # --- Streak and user stats announcement ---
     streak = Storage.get_group_streak()
@@ -382,6 +389,15 @@ else:
         await interaction.followup.send("Manual game ended and gallery posted.", ephemeral=True)
         log_info(f"Manual game ended by {interaction.user.id}")
 
+# --- Scheduler Setup ---
+def setup_scheduler():
+    scheduler = AsyncIOScheduler(timezone=EST)
+    # Schedule jobs for 5 PM EST
+    scheduler.add_job(lambda: asyncio.create_task(start_daily_game()), CronTrigger(hour=17, minute=0, timezone=EST))
+    scheduler.add_job(lambda: asyncio.create_task(end_game_job()), CronTrigger(hour=17, minute=0, second=10, timezone=EST))
+    return scheduler
+
+# --- Console Control Thread ---
 def console_control():
     while True:
         cmd = input()
@@ -392,7 +408,10 @@ def console_control():
             print("Bot is running.")
         elif cmd.strip().lower() == "help":
             print("Available commands: stop, status, help")
-        # Add more commands as needed
-threading.Thread(target=console_control, daemon=True).start()
 
-bot.run(DISCORD_TOKEN)
+# --- Main Entrypoint ---
+def main():
+    threading.Thread(target=console_control, daemon=True).start()
+    bot.run(DISCORD_TOKEN)
+
+main()
