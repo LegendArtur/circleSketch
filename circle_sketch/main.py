@@ -97,8 +97,30 @@ def log_startup_settings():
     log_info(f"SCHEDULED_GAME_TIME: {os.getenv('SCHEDULED_GAME_TIME', '17:00')}")
     log_info(f"CIRCLE_SKETCH_DB_BACKEND: {os.getenv('CIRCLE_SKETCH_DB_BACKEND', 'sqlite')}")
     if os.getenv('CIRCLE_SKETCH_DB_BACKEND', 'sqlite').lower() == 'mysql':
-        log_info(f"CIRCLE_SKETCH_MYSQL_URL: {os.getenv('CIRCLE_SKETCH_MYSQL_URL', 'not set')}")
+        mysql_url = os.getenv('CIRCLE_SKETCH_MYSQL_URL', 'not set')
+        log_info(f"CIRCLE_SKETCH_MYSQL_URL: {mysql_url}")
+        if mysql_url != 'not set':
+            try:
+                parts = parse_mysql_url(mysql_url)
+                log_info(f"  user: {parts['user']}")
+                log_info(f"  host: {parts['host']}")
+                log_info(f"  database: {parts['database']}")
+            except Exception as e:
+                log_warn(f"  Could not parse MySQL URL: {e}")
     log_info("-------------------------------------")
+
+def parse_mysql_url(url):
+    import re
+    m = re.match(r"mysql://([^:]+):([^@]+)@([^/]+)/(.+)", url)
+    if not m:
+        raise RuntimeError("CIRCLE_SKETCH_MYSQL_URL must be in format mysql://user:pass@host/db")
+    user, password, host, db = m.groups()
+    return {
+        'user': user,
+        'password': password,
+        'host': host,
+        'database': db
+    }
 
 def main():
     log_startup_settings()
