@@ -15,6 +15,7 @@ from colorama import Fore, Style, init as colorama_init
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import pytz
+import threading
 
 colorama_init(autoreset=True)
 
@@ -381,5 +382,17 @@ else:
         await interaction.followup.send("Manual game ended and gallery posted.", ephemeral=True)
         log_info(f"Manual game ended by {interaction.user.id}")
 
-if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
+def console_control():
+    while True:
+        cmd = input()
+        if cmd.strip().lower() == "stop":
+            print("Shutting down bot...")
+            os._exit(0)
+        elif cmd.strip().lower() == "status":
+            print("Bot is running.")
+        elif cmd.strip().lower() == "help":
+            print("Available commands: stop, status, help")
+        # Add more commands as needed
+threading.Thread(target=console_control, daemon=True).start()
+
+bot.run(DISCORD_TOKEN)
