@@ -21,10 +21,22 @@ CircleSketch is a robust, production-ready Discord bot for running daily asynchr
    ```
 3. **Configure environment variables**
    - Copy `.env.example` to `.env` and fill in your Discord bot token and channel ID.
+   - Or set `DISCORD_TOKEN` and `GAME_CHANNEL_ID` as environment variables.
 4. **Run the bot**
-   ```sh
-   python -m circle_sketch.main
-   ```
+   - **Recommended:**
+     ```sh
+     python -m circle_sketch.main
+     ```
+   - **If your host does not support `-m` (e.g., some shared hosts):**
+     ```sh
+     python run_bot.py
+     ```
+
+## Production & Hosting
+- The bot writes logs to both the console and a rotating file (`bot.log` by default).
+- You can control the bot from the console with commands: `stop`, `status`, `help`.
+- For 24/7 hosting, use a process manager (e.g., `screen`, `tmux`, or your host's panel).
+- See `run_bot.py` for alternate launch instructions if needed.
 
 ## Configuration
 - `circle_sketch/config.py`: Set up your Discord token, game channel, and other settings.
