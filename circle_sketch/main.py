@@ -33,11 +33,14 @@ shutdown_event = threading.Event()
 
 def console_control():
     while True:
-        cmd = input()
+        try:
+            cmd = input()
+        except (EOFError, KeyboardInterrupt):
+            print("Console input closed. Exiting console control thread.")
+            break
         if cmd.strip().lower() == "stop":
             print("Shutting down bot...")
-            shutdown_event.set()
-            break
+            os._exit(0)
         elif cmd.strip().lower() == "status":
             print("Bot is running.")
         elif cmd.strip().lower() == "help":
