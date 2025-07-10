@@ -173,4 +173,16 @@ class Storage:
         conn.commit()
         conn.close()
 
+    @staticmethod
+    def reset_all_streaks():
+        """Reset both group and all user streaks to zero."""
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        # Reset group streak
+        c.execute('UPDATE group_streak SET streak=0 WHERE id=1')
+        # Reset all user streaks
+        c.execute('UPDATE user_streaks SET streak=0')
+        conn.commit()
+        conn.close()
+
 Storage.init()

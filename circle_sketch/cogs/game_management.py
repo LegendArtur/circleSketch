@@ -123,7 +123,26 @@ class GameManagement(commands.Cog):
         theme = state['theme']
         date = state.get('date', 'unknown')
         user_ids = state.get('user_ids', [])
-        await interaction.followup.send(f"Current game theme: **{theme}** (started {date}). Players: {len(user_ids)}", ephemeral=True)
+        gallery = state.get('gallery', {})
+        # Calculate time left if scheduled game
+        now = datetime.datetime.now(EST)
+        next_end = now.replace(hour=17, minute=0, second=0, microsecond=0)
+        if now >= next_end:
+            next_end += datetime.timedelta(days=1)
+        time_left = next_end - now
+        hours, remainder = divmod(time_left.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        time_left_str = f"{hours}h {minutes}m {seconds}s"
+        # Compose status message
+        msg = (
+            f"**CircleSketch Game Status**\n"
+            f"Theme: **{theme}**\n"
+            f"Started: {date}\n"
+            f"Players in circle: {len(user_ids)}\n"
+            f"Submissions so far: {len(gallery)}\n"
+            f"Time left: {time_left_str} until next scheduled end\n"
+        )
+        await interaction.followup.send(msg, ephemeral=True)
 
     @app_commands.command(name="show_streaks", description="Show the current group and per-user streaks.")
     async def show_streaks(self, interaction: Interaction):
