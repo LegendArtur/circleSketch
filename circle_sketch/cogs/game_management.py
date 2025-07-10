@@ -60,13 +60,31 @@ class GameManagement(commands.Cog):
         date = state.get('date', 'unknown')
         gallery = state.get('gallery', {})
         streak = Storage.get_group_streak()
+        # Per-user streaks
+        user_streaks = {}
         if not gallery:
             await channel.send(f"No submissions for today's theme: **{theme}**. The streak has ended at {streak}.")
             Storage.set_group_streak(0)
+            # Reset all user streaks
+            for user_id in state.get('user_ids', []):
+                Storage.set_user_streak(user_id, 0)
         else:
-            # Increment streak
+            # Increment group streak
             Storage.set_group_streak(streak + 1)
-            await channel.send(f"Gallery for '**{theme}**' - {date}! Current streak: {streak + 1}")
+            # Increment user streaks for submitters, reset for non-submitters
+            submitted_ids = set(int(uid) for uid in gallery.keys())
+            all_ids = set(int(uid) for uid in state.get('user_ids', []))
+            for user_id in all_ids:
+                if user_id in submitted_ids:
+                    new_streak = Storage.get_user_streak(user_id) + 1
+                    Storage.set_user_streak(user_id, new_streak)
+                    user_streaks[user_id] = new_streak
+                else:
+                    Storage.set_user_streak(user_id, 0)
+                    user_streaks[user_id] = 0
+            # Compose streak summary
+            streak_lines = [f"<@{uid}>: {user_streaks[uid]}" for uid in user_streaks]
+            await channel.send(f"Gallery for '**{theme}**' - {date}! Current group streak: {streak + 1}\nUser streaks:\n" + "\n".join(streak_lines))
             for user_id, img_url in gallery.items():
                 try:
                     user = await self.bot.fetch_user(int(user_id))
@@ -107,6 +125,31 @@ class GameManagement(commands.Cog):
         date = state.get('date', 'unknown')
         user_ids = state.get('user_ids', [])
         await interaction.followup.send(f"Current game theme: **{theme}** (started {date}). Players: {len(user_ids)}", ephemeral=True)
+
+    @app_commands.command(name="show_streaks", description="Show the current group and per-user streaks.")
+    async def show_streaks(self, interaction: Interaction):
+        await interaction.response.defer(ephemeral=True)
+        group_streak = Storage.get_group_streak()
+        state = Storage.get_game_state() or {}
+        user_ids = state.get('user_ids', [])
+        # If no game running, show all streaks in DB
+        if not user_ids:
+            # Try to get all user streaks from DB
+            try:
+                conn = Storage._get_conn()
+                c = conn.cursor()
+                c.execute('SELECT user_id, streak FROM user_streaks')
+                rows = c.fetchall()
+                conn.close()
+                if not rows:
+                    await interaction.followup.send(f"Current group streak: {group_streak}\nNo user streaks found.", ephemeral=True)
+                    return
+                streak_lines = [f"<@{row['user_id']}>: {row['streak']}" for row in rows]
+            except Exception:
+                streak_lines = []
+        else:
+            streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)}" for uid in user_ids]
+        await interaction.followup.send(f"Current group streak: {group_streak}\nUser streaks:\n" + "\n".join(streak_lines), ephemeral=True)
 
     async def scheduled_start_game(self):
         circle = Storage.get_player_circle()

@@ -39,6 +39,11 @@ class Storage:
             key TEXT PRIMARY KEY,
             value TEXT
         )''')
+        # New: Table for per-user streaks
+        c.execute('''CREATE TABLE IF NOT EXISTS user_streaks (
+            user_id INTEGER PRIMARY KEY,
+            streak INTEGER DEFAULT 0
+        )''')
         # Ensure group_streak row exists
         c.execute('INSERT OR IGNORE INTO group_streak (id, streak) VALUES (1, 0)')
         # Ensure first_game_started flag exists
@@ -148,6 +153,23 @@ class Storage:
         conn = Storage._get_conn()
         c = conn.cursor()
         c.execute('UPDATE bot_flags SET value=? WHERE key="first_game_started"', ("1" if val else "0",))
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def get_user_streak(user_id):
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        c.execute('SELECT streak FROM user_streaks WHERE user_id=?', (user_id,))
+        row = c.fetchone()
+        conn.close()
+        return row['streak'] if row else 0
+
+    @staticmethod
+    def set_user_streak(user_id, streak):
+        conn = Storage._get_conn()
+        c = conn.cursor()
+        c.execute('INSERT INTO user_streaks (user_id, streak) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET streak=?', (user_id, streak, streak))
         conn.commit()
         conn.close()
 
