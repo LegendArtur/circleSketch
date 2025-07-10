@@ -5,3 +5,4 @@ pillow
 colorama
 requests
 pytest
+pytz
