@@ -33,17 +33,21 @@ class CircleManagement(commands.Cog):
     @app_commands.command(name="join_circle", description="Join the persistent player circle.")
     async def join_circle(self, interaction: Interaction):
         logger.info(f"join_circle command triggered by user {interaction.user.id}")
+        responded = False
         try:
             await interaction.response.defer(ephemeral=True)
+            responded = True
             user_id = interaction.user.id
             username = interaction.user.display_name
             circle = Storage.get_player_circle(interaction.guild.id)
             if user_id in circle:
                 await interaction.followup.send("You are already in the circle.", ephemeral=True)
+                responded = True
                 logger.info(f"User {user_id} attempted to join but is already in the circle.")
                 return
             if len(circle) >= CIRCLE_LIMIT:
                 await interaction.followup.send(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
+                responded = True
                 logger.warning("Circle is full. User could not join.")
                 return
             circle.append(user_id)
@@ -52,6 +56,7 @@ class CircleManagement(commands.Cog):
             await channel.send(f"<@{user_id}> joined the Circle!")
             logger.info(f"User {user_id} joined the circle.")
             await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
+            responded = True
             state = Storage.get_game_state()
             if state and 'theme' in state:
                 if user_id not in state.get('user_ids', []):
@@ -64,7 +69,11 @@ class CircleManagement(commands.Cog):
                     logger.error(f"Failed to DM user {user_id}: {e}")
         except Exception as e:
             logger.error(f"Unexpected error in join_circle: {e}")
-            await interaction.followup.send("An error occurred while joining the circle. Please try again later.", ephemeral=True)
+            if not responded:
+                try:
+                    await interaction.followup.send("An error occurred while joining the circle. Please try again later.", ephemeral=True)
+                except Exception:
+                    pass
 
     @app_commands.command(name="leave_circle", description="Leave the persistent player circle.")
     async def leave_circle(self, interaction: Interaction):
