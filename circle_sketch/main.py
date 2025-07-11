@@ -139,7 +139,7 @@ def main():
 def run_bot():
     async def runner():
         await load_cogs(bot)
-        bot_task = asyncio.create_task(bot.start(DISCORD_TOKEN))
+        bot_task = asyncio.create_task(bot.start(DISCORD_TOKEN, reconnect=True))
         while not shutdown_event.is_set():
             await asyncio.sleep(0.2)
         await bot.close()

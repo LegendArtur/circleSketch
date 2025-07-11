@@ -63,6 +63,10 @@ class GameManagement(commands.Cog):
         self.scheduler.add_job(self.scheduled_start_game, CronTrigger(hour=17, minute=0, second=10, timezone=EST))
         self.scheduler.start()
 
+    @commands.Cog.listener()
+    async def on_resumed(self):
+        logger.info("Bot connection resumed (reconnected to Discord gateway)")
+
     @app_commands.command(name="start_manual_game", description="Start a manual game (ends only when ended by the starter)")
     async def start_manual_game(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
