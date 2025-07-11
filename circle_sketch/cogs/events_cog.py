@@ -4,26 +4,21 @@ from discord import Message
 from ..storage.storage import Storage
 from ..gallery.gallery import make_gallery_image
 from ..config import GAME_CHANNEL_ID
-from ..main import log_info, log_warn, log_error, log_success
 import logging
+import queue
+from logging.handlers import QueueHandler, QueueListener
 import datetime
-import os
-from colorama import Fore, Style, init as colorama_init
 
-colorama_init(autoreset=True)
-
-# --- Logging Helpers ---
-def log_info(msg):
-    print(Fore.CYAN + Style.BRIGHT + f"[INFO] {msg}" + Style.RESET_ALL)
-
-def log_success(msg):
-    print(Fore.GREEN + Style.BRIGHT + f"[SUCCESS] {msg}" + Style.RESET_ALL)
-
-def log_warn(msg):
-    print(Fore.YELLOW + Style.BRIGHT + f"[WARN] {msg}" + Style.RESET_ALL)
-
-def log_error(msg):
-    print(Fore.RED + Style.BRIGHT + f"[ERROR] {msg}" + Style.RESET_ALL)
+# --- Logging Setup ---
+log_queue = queue.Queue(-1)
+queue_handler = QueueHandler(log_queue)
+formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+queue_listener = QueueListener(log_queue, stream_handler)
+logging.basicConfig(level=logging.INFO, handlers=[queue_handler])
+logger = logging.getLogger('circle_sketch')
+queue_listener.start()
 
 class EventsCog(commands.Cog):
     def __init__(self, bot):
@@ -31,20 +26,25 @@ class EventsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_connect(self):
-        log_info("Bot connected to Discord gateway.")
+        logger.info(f'Bot connected to Discord gateway. User: {self.bot.user}, Latency: {getattr(self.bot, "latency", "N/A")}, Guilds: {len(getattr(self.bot, "guilds", []))}')
 
     @commands.Cog.listener()
     async def on_disconnect(self):
-        log_warn("Bot disconnected from Discord gateway.")
+        try:
+            reconnecting = getattr(self.bot, 'is_closed', lambda: None)()
+            shard_count = getattr(self.bot, 'shard_count', None)
+            logger.warning(f'Bot disconnected from Discord gateway. Reconnecting: {reconnecting}, Shard count: {shard_count}, Time: {datetime.datetime.now().isoformat()}')
+        except Exception as e:
+            logger.error(f'Error during disconnect logging: {e}')
 
     @commands.Cog.listener()
     async def on_ready(self):
-        log_info(f"Logged in as {self.bot.user}")
+        logger.info(f'Logged in as {self.bot.user} (ID: {getattr(self.bot.user, "id", "N/A")}), Guilds: {len(getattr(self.bot, "guilds", []))}, Latency: {getattr(self.bot, "latency", "N/A")}, Time: {datetime.datetime.now().isoformat()}')
         try:
             synced = await self.bot.tree.sync()
-            log_info(f"Synced {len(synced)} commands.")
+            logger.info(f'Synced {len(synced)} commands.')
         except Exception as e:
-            log_error(f"Failed to sync commands: {e}")
+            logger.error(f'Failed to sync commands: {e}')
 
     @commands.Cog.listener()
     async def on_message(self, message: Message):
@@ -56,16 +56,16 @@ class EventsCog(commands.Cog):
         user_id = message.author.id
         # Only process DMs for submissions
         if isinstance(message.channel, discord.DMChannel):
-            log_info(f"DM from {message.author} (ID: {user_id}): {message.type}")
+            logger.info(f'DM from {message.author} (ID: {user_id}): {message.type}')
             if user_id not in state.get('user_ids', []):
                 return
             if user_id in state.get('submissions', {}):
                 await message.channel.send("You have already submitted for today's game!")
-                log_info(f"User {user_id} tried to submit again.")
+                logger.info(f'User {user_id} tried to submit again.')
                 return
             if not message.attachments:
-                await message.channel.send("Please submit an image attachment.")
-                log_info(f"User {user_id} submitted without an image.")
+                await message.channel.send('Please submit an image attachment.')
+                logger.info(f'User {user_id} submitted without an image.')
                 return
             img_url = message.attachments[0].url
             # Save submission
@@ -76,41 +76,41 @@ class EventsCog(commands.Cog):
             state['submissions'][user_id] = img_url
             state['gallery'][user_id] = img_url
             Storage.set_game_state(state)
-            await message.channel.send("Submission received! Thank you.")
-            log_info(f"User {user_id} submitted their drawing.")
+            await message.channel.send('Submission received! Thank you.')
+            logger.info(f'User {user_id} submitted their drawing.')
             channel = self.bot.get_channel(GAME_CHANNEL_ID)
-            await channel.send(f"<@{user_id}> has submitted their image for today! You can still join the current game by typing `/join_circle`.")
+            await channel.send(f'<@{user_id}> has submitted their image for today! You can still join the current game by typing `/join_circle`.')
 
     @commands.Cog.listener()
     async def on_member_join(self, member):
-        log_info(f"Member joined: {member} (ID: {member.id})")
+        logger.info(f'Member joined: {member} (ID: {member.id})')
 
     @commands.Cog.listener()
     async def on_member_remove(self, member):
-        log_warn(f"Member left: {member} (ID: {member.id})")
+        logger.warning(f'Member left: {member} (ID: {member.id})')
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
-        log_success(f"Bot joined new guild: {guild.name} (ID: {guild.id})")
+        logger.info(f'Bot joined new guild: {guild.name} (ID: {guild.id})')
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
-        log_warn(f"Bot removed from guild: {guild.name} (ID: {guild.id})")
+        logger.warning(f'Bot removed from guild: {guild.name} (ID: {guild.id})')
 
     @commands.Cog.listener()
     async def on_error(self, event_method, *args, **kwargs):
-        log_error(f"Error in event: {event_method}")
+        logger.error(f'Error in event: {event_method}')
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
-            log_warn(f"Unknown command used: {ctx.message.content}")
+            logger.warning(f'Unknown command used: {ctx.message.content}')
         elif isinstance(error, commands.MissingRequiredArgument):
-            log_warn(f"Missing argument for command: {ctx.command}")
+            logger.warning(f'Missing argument for command: {ctx.command}')
         elif isinstance(error, commands.CheckFailure):
-            log_warn(f"Check failed for command: {ctx.command}")
+            logger.warning(f'Check failed for command: {ctx.command}')
         else:
-            log_error(f"Unhandled command error: {error}")
+            logger.error(f'Unhandled command error: {error}')
 
 async def setup(bot):
     await bot.add_cog(EventsCog(bot))

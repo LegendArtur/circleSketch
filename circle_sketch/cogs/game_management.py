@@ -13,8 +13,22 @@ import datetime
 import os
 import shutil
 import io
+import logging
+import queue
+from logging.handlers import QueueHandler, QueueListener
 
 EST = pytz.timezone('America/New_York')
+
+# --- Logging Setup ---
+log_queue = queue.Queue(-1)
+queue_handler = QueueHandler(log_queue)
+formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+queue_listener = QueueListener(log_queue, stream_handler)
+logging.basicConfig(level=logging.INFO, handlers=[queue_handler])
+logger = logging.getLogger('circle_sketch')
+queue_listener.start()
 
 # --- Admin Check ---
 def is_admin(interaction: Interaction):
@@ -60,6 +74,7 @@ class GameManagement(commands.Cog):
         circle = Storage.get_player_circle()
         if len(circle) < 1:
             await interaction.followup.send("Not enough players to start the game.", ephemeral=True)
+            logger.warning("Not enough players to start the game.")
             return
         prompt = random.choice(PROMPT_LIST)
         today = datetime.datetime.now().strftime('%Y-%m-%d')
@@ -77,12 +92,13 @@ class GameManagement(commands.Cog):
         img_bytes = make_theme_announcement_image(prompt)
         file = discord.File(img_bytes, filename="theme.png")
         await channel.send(content="@everyone Today's game is starting!", file=file)
+        logger.info(f"Manual game started with prompt: {prompt}")
         for user_id in circle:
             try:
                 user = await self.bot.fetch_user(user_id)
                 await user.send(f"Today's drawing theme: **{prompt}**. Please reply with your drawing as an image attachment.")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to DM user {user_id}: {e}")
         await interaction.followup.send("Manual game started! Prompt posted.", ephemeral=True)
 
     async def end_game_phase(self, channel, state):

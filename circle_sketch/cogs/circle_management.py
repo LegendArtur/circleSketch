@@ -1,3 +1,17 @@
+import logging
+import queue
+from logging.handlers import QueueHandler, QueueListener
+# --- Logging Setup ---
+log_queue = queue.Queue(-1)
+queue_handler = QueueHandler(log_queue)
+formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+queue_listener = QueueListener(log_queue, stream_handler)
+logging.basicConfig(level=logging.INFO, handlers=[queue_handler])
+logger = logging.getLogger('circle_sketch')
+queue_listener.start()
+
 import discord
 from discord import app_commands, Interaction
 from discord.ext import commands
@@ -24,14 +38,17 @@ class CircleManagement(commands.Cog):
         circle = Storage.get_player_circle()
         if user_id in circle:
             await interaction.followup.send("You are already in the circle.", ephemeral=True)
+            logger.info(f"User {user_id} attempted to join but is already in the circle.")
             return
         if len(circle) >= CIRCLE_LIMIT:
             await interaction.followup.send(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
+            logger.warning("Circle is full. User could not join.")
             return
         circle.append(user_id)
         Storage.set_player_circle(circle)
         channel = self.bot.get_channel(GAME_CHANNEL_ID)
         await channel.send(f"<@{user_id}> joined the Circle!")
+        logger.info(f"User {user_id} joined the circle.")
         await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
         state = Storage.get_game_state()
         if state and 'theme' in state:
@@ -41,8 +58,8 @@ class CircleManagement(commands.Cog):
             try:
                 user = await self.bot.fetch_user(user_id)
                 await user.send(f"A game is currently running! Today's drawing theme: **{state['theme']}**. Please reply with your drawing as an image attachment.")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.error(f"Failed to DM user {user_id}: {e}")
 
     @app_commands.command(name="leave_circle", description="Leave the persistent player circle.")
     async def leave_circle(self, interaction: Interaction):

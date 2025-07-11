@@ -5,21 +5,32 @@ import asyncio
 import os
 import signal
 from .config import DISCORD_TOKEN
-from colorama import Fore, Style, init as colorama_init
+import logging
+import queue
+from logging.handlers import QueueHandler, QueueListener
 
-colorama_init(autoreset=True)
+# --- Logging Setup ---
+log_queue = queue.Queue(-1)
+queue_handler = QueueHandler(log_queue)
+formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+queue_listener = QueueListener(log_queue, stream_handler)
+logging.basicConfig(level=logging.INFO, handlers=[queue_handler])
+logger = logging.getLogger('circle_sketch')
+queue_listener.start()
 
 def log_info(msg):
-    print(Fore.CYAN + Style.BRIGHT + f"[INFO] {msg}" + Style.RESET_ALL)
+    logger.info(msg)
 
 def log_success(msg):
-    print(Fore.GREEN + Style.BRIGHT + f"[SUCCESS] {msg}" + Style.RESET_ALL)
+    logger.info(msg)
 
 def log_warn(msg):
-    print(Fore.YELLOW + Style.BRIGHT + f"[WARN] {msg}" + Style.RESET_ALL)
+    logger.warning(msg)
 
 def log_error(msg):
-    print(Fore.RED + Style.BRIGHT + f"[ERROR] {msg}" + Style.RESET_ALL)
+    logger.error(msg)
 
 def create_bot():
     intents = discord.Intents.default()
