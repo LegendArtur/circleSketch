@@ -132,18 +132,31 @@ class GameManagement(commands.Cog):
                     Storage.set_user_streak(user_id, 0)
                     user_streaks[user_id] = 0
             # Compose streak summary
-            streak_lines = [f"<@{uid}>: {user_streaks[uid]}🔥" if user_streaks[uid] > 0 else f"<@{uid}>: 0" for uid in user_streaks]
+            streak_lines = [f"<@{uid}>: {user_streaks[uid]} 🔥" if user_streaks[uid] > 0 else f"<@{uid}>: 0" for uid in user_streaks]
             await channel.send(f"Gallery for '**{theme}**' - {date}! Current group streak: {streak + 1} 🔥\nUser streaks:\n" + "\n".join(streak_lines))
             for user_id, img_path in gallery.items():
+                temp_path = None
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                    # Use local image path for gallery
-                    with open(img_path, 'rb') as f:
+                    # If img_path is a Discord URL, download it to a temp file
+                    if img_path.startswith('http'):
+                        temp_path = await Storage.download_image(img_path)
+                        img_to_open = temp_path
+                    else:
+                        img_to_open = img_path
+                    with open(img_to_open, 'rb') as f:
                         img_bytes = f.read()
                     file = discord.File(io.BytesIO(img_bytes), filename=f"gallery_{user_id}.png")
                     await channel.send(file=file)
                 except Exception as e:
                     await channel.send(f"Failed to generate gallery image for <@{user_id}>: {e}")
+                finally:
+                    # Clean up temp file if used
+                    if temp_path:
+                        try:
+                            os.remove(temp_path)
+                        except Exception:
+                            pass
             # Clean up local images
             clear_submission_images(gallery.keys())
         Storage.set_game_state({})
@@ -214,11 +227,11 @@ class GameManagement(commands.Cog):
                 if not rows:
                     await interaction.followup.send(f"Current group streak: {group_streak}\nNo user streaks found.", ephemeral=True)
                     return
-                streak_lines = [f"<@{row['user_id']}>: {row['streak']}🔥" if row['streak'] > 0 else f"<@{row['user_id']}>: 0" for row in rows]
+                streak_lines = [f"<@{row['user_id']}>: {row['streak']} 🔥" if row['streak'] > 0 else f"<@{row['user_id']}>: 0" for row in rows]
             except Exception:
                 streak_lines = []
         else:
-            streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)}🔥" if Storage.get_user_streak(uid) > 0 else f"<@{uid}>: 0" for uid in user_ids]
+            streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)} 🔥" if Storage.get_user_streak(uid) > 0 else f"<@{uid}>: 0" for uid in user_ids]
         await interaction.followup.send(f"Current group streak: {group_streak} 🔥\n\nUser streaks:\n" + "\n".join(streak_lines), ephemeral=True)
 
     async def scheduled_start_game(self):
