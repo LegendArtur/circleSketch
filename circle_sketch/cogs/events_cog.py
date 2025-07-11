@@ -5,20 +5,8 @@ from ..storage.storage import Storage
 from ..gallery.gallery import make_gallery_image
 from ..config import GAME_CHANNEL_ID
 import logging
-import queue
-from logging.handlers import QueueHandler, QueueListener
-import datetime
 
-# --- Logging Setup ---
-log_queue = queue.Queue(-1)
-queue_handler = QueueHandler(log_queue)
-formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(formatter)
-queue_listener = QueueListener(log_queue, stream_handler)
-logging.basicConfig(level=logging.INFO, handlers=[queue_handler])
 logger = logging.getLogger('circle_sketch')
-queue_listener.start()
 
 class EventsCog(commands.Cog):
     def __init__(self, bot):
@@ -33,13 +21,13 @@ class EventsCog(commands.Cog):
         try:
             reconnecting = getattr(self.bot, 'is_closed', lambda: None)()
             shard_count = getattr(self.bot, 'shard_count', None)
-            logger.warning(f'Bot disconnected from Discord gateway. Reconnecting: {reconnecting}, Shard count: {shard_count}, Time: {datetime.datetime.now().isoformat()}')
+            logger.warning(f'Bot disconnected from Discord gateway. Reconnecting: {reconnecting}, Shard count: {shard_count}')
         except Exception as e:
             logger.error(f'Error during disconnect logging: {e}')
 
     @commands.Cog.listener()
     async def on_ready(self):
-        logger.info(f'Logged in as {self.bot.user} (ID: {getattr(self.bot.user, "id", "N/A")}), Guilds: {len(getattr(self.bot, "guilds", []))}, Latency: {getattr(self.bot, "latency", "N/A")}, Time: {datetime.datetime.now().isoformat()}')
+        logger.info(f'Logged in as {self.bot.user} (ID: {getattr(self.bot.user, "id", "N/A")}), Guilds: {len(getattr(self.bot, "guilds", []))}, Latency: {getattr(self.bot, "latency", "N/A")}')
         try:
             synced = await self.bot.tree.sync()
             logger.info(f'Synced {len(synced)} commands.')
@@ -114,3 +102,5 @@ class EventsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(EventsCog(bot))
+print("Bot starting... (events_cog loaded)")
+logger.info("Logger imported in events_cog")

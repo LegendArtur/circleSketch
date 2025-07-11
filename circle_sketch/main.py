@@ -6,19 +6,16 @@ import os
 import signal
 from .config import DISCORD_TOKEN
 import logging
-import queue
-from logging.handlers import QueueHandler, QueueListener
-
 # --- Logging Setup ---
-log_queue = queue.Queue(-1)
-queue_handler = QueueHandler(log_queue)
 formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
-queue_listener = QueueListener(log_queue, stream_handler)
-logging.basicConfig(level=logging.INFO, handlers=[queue_handler])
 logger = logging.getLogger('circle_sketch')
-queue_listener.start()
+logger.setLevel(logging.INFO)
+logger.addHandler(stream_handler)
+logger.propagate = False
+print("Bot starting... (main.py loaded)")
+logger.info("Logger initialized in main.py")
 
 def log_info(msg):
     logger.info(msg)
