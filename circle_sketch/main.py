@@ -7,7 +7,7 @@ import signal
 from .config import DISCORD_TOKEN
 import logging
 # --- Logging Setup ---
-formatter = logging.Formatter('[%(levelname)s] %(asctime)s %(name)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+formatter = logging.Formatter('[%(levelname)s] %(name)s: %(message)s')
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 logger = logging.getLogger('circle_sketch')
