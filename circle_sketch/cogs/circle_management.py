@@ -32,34 +32,39 @@ class CircleManagement(commands.Cog):
 
     @app_commands.command(name="join_circle", description="Join the persistent player circle.")
     async def join_circle(self, interaction: Interaction):
-        await interaction.response.defer(ephemeral=True)
-        user_id = interaction.user.id
-        username = interaction.user.display_name
-        circle = Storage.get_player_circle()
-        if user_id in circle:
-            await interaction.followup.send("You are already in the circle.", ephemeral=True)
-            logger.info(f"User {user_id} attempted to join but is already in the circle.")
-            return
-        if len(circle) >= CIRCLE_LIMIT:
-            await interaction.followup.send(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
-            logger.warning("Circle is full. User could not join.")
-            return
-        circle.append(user_id)
-        Storage.set_player_circle(circle)
-        channel = self.bot.get_channel(GAME_CHANNEL_ID)
-        await channel.send(f"<@{user_id}> joined the Circle!")
-        logger.info(f"User {user_id} joined the circle.")
-        await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
-        state = Storage.get_game_state()
-        if state and 'theme' in state:
-            if user_id not in state.get('user_ids', []):
-                state['user_ids'].append(user_id)
-                Storage.set_game_state(state)
-            try:
-                user = await self.bot.fetch_user(user_id)
-                await user.send(f"A game is currently running! Today's drawing theme: **{state['theme']}**. Please reply with your drawing as an image attachment.")
-            except Exception as e:
-                logger.error(f"Failed to DM user {user_id}: {e}")
+        logger.info(f"join_circle command triggered by user {interaction.user.id}")
+        try:
+            await interaction.response.defer(ephemeral=True)
+            user_id = interaction.user.id
+            username = interaction.user.display_name
+            circle = Storage.get_player_circle()
+            if user_id in circle:
+                await interaction.followup.send("You are already in the circle.", ephemeral=True)
+                logger.info(f"User {user_id} attempted to join but is already in the circle.")
+                return
+            if len(circle) >= CIRCLE_LIMIT:
+                await interaction.followup.send(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
+                logger.warning("Circle is full. User could not join.")
+                return
+            circle.append(user_id)
+            Storage.set_player_circle(circle)
+            channel = self.bot.get_channel(GAME_CHANNEL_ID)
+            await channel.send(f"<@{user_id}> joined the Circle!")
+            logger.info(f"User {user_id} joined the circle.")
+            await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
+            state = Storage.get_game_state()
+            if state and 'theme' in state:
+                if user_id not in state.get('user_ids', []):
+                    state['user_ids'].append(user_id)
+                    Storage.set_game_state(state)
+                try:
+                    user = await self.bot.fetch_user(user_id)
+                    await user.send(f"A game is currently running! Today's drawing theme: **{state['theme']}**. Please reply with your drawing as an image attachment.")
+                except Exception as e:
+                    logger.error(f"Failed to DM user {user_id}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error in join_circle: {e}")
+            await interaction.followup.send("An error occurred while joining the circle. Please try again later.", ephemeral=True)
 
     @app_commands.command(name="leave_circle", description="Leave the persistent player circle.")
     async def leave_circle(self, interaction: Interaction):
