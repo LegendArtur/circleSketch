@@ -40,28 +40,36 @@ class CircleManagement(commands.Cog):
             user_id = interaction.user.id
             username = interaction.user.display_name
             circle = Storage.get_player_circle(interaction.guild.id)
+            logger.debug(f"Fetched circle for guild {interaction.guild.id}: {circle}")
             if user_id in circle:
+                logger.debug(f"User {user_id} already in circle for guild {interaction.guild.id}")
                 await interaction.followup.send("You are already in the circle.", ephemeral=True)
                 responded = True
                 logger.info(f"User {user_id} attempted to join but is already in the circle.")
                 return
             if len(circle) >= CIRCLE_LIMIT:
+                logger.debug(f"Circle full for guild {interaction.guild.id}: {circle}")
                 await interaction.followup.send(f"Sorry, the circle is full ({CIRCLE_LIMIT}/10). A spot will open when someone leaves.", ephemeral=True)
                 responded = True
                 logger.warning("Circle is full. User could not join.")
                 return
             circle.append(user_id)
+            logger.debug(f"Adding user {user_id} to circle for guild {interaction.guild.id}: {circle}")
             Storage.set_player_circle(interaction.guild.id, circle)
+            logger.debug(f"Circle after update for guild {interaction.guild.id}: {Storage.get_player_circle(interaction.guild.id)}")
             channel = self.bot.get_channel(GAME_CHANNEL_ID)
             await channel.send(f"<@{user_id}> joined the Circle!")
             logger.info(f"User {user_id} joined the circle.")
             await interaction.followup.send(f"Welcome! The circle now has {len(circle)}/{CIRCLE_LIMIT} players.", ephemeral=True)
             responded = True
             state = Storage.get_game_state()
+            logger.debug(f"Fetched game state: {state}")
             if state and 'theme' in state:
                 if user_id not in state.get('user_ids', []):
                     state['user_ids'].append(user_id)
+                    logger.debug(f"Added user {user_id} to game state user_ids: {state['user_ids']}")
                     Storage.set_game_state(state)
+                    logger.debug(f"Game state after update: {Storage.get_game_state()}")
                 try:
                     user = await self.bot.fetch_user(user_id)
                     await user.send(f"A game is currently running! Today's drawing theme: **{state['theme']}**. Please reply with your drawing as an image attachment.")
