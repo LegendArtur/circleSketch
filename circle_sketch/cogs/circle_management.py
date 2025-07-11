@@ -37,7 +37,7 @@ class CircleManagement(commands.Cog):
             await interaction.response.defer(ephemeral=True)
             user_id = interaction.user.id
             username = interaction.user.display_name
-            circle = Storage.get_player_circle()
+            circle = Storage.get_player_circle(interaction.guild.id)
             if user_id in circle:
                 await interaction.followup.send("You are already in the circle.", ephemeral=True)
                 logger.info(f"User {user_id} attempted to join but is already in the circle.")
@@ -47,7 +47,7 @@ class CircleManagement(commands.Cog):
                 logger.warning("Circle is full. User could not join.")
                 return
             circle.append(user_id)
-            Storage.set_player_circle(circle)
+            Storage.set_player_circle(interaction.guild.id, circle)
             channel = self.bot.get_channel(GAME_CHANNEL_ID)
             await channel.send(f"<@{user_id}> joined the Circle!")
             logger.info(f"User {user_id} joined the circle.")
@@ -71,18 +71,18 @@ class CircleManagement(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
         username = interaction.user.display_name
-        circle = Storage.get_player_circle()
+        circle = Storage.get_player_circle(interaction.guild.id)
         if user_id not in circle:
             await interaction.followup.send("You are not in the circle.", ephemeral=True)
             return
         circle.remove(user_id)
-        Storage.set_player_circle(circle)
+        Storage.set_player_circle(interaction.guild.id, circle)
         await interaction.followup.send("You have left the circle.", ephemeral=True)
 
     @app_commands.command(name="list_circle", description="List current members of the player circle.")
     async def list_circle(self, interaction: Interaction):
         await interaction.response.defer(ephemeral=True)
-        circle = Storage.get_player_circle()
+        circle = Storage.get_player_circle(interaction.guild.id)
         if not circle:
             await interaction.followup.send("The player circle is currently empty.", ephemeral=True)
             return
@@ -104,7 +104,7 @@ class CircleManagement(commands.Cog):
                 self.value = None
             @discord.ui.button(label="Yes. I am sure.", style=discord.ButtonStyle.danger)
             async def confirm(self, interaction2: Interaction, button: discord.ui.Button):
-                Storage.set_player_circle([])
+                Storage.set_player_circle(interaction.guild.id, [])
                 await interaction2.response.edit_message(content="Player circle has been reset.", view=None)
                 self.value = True
                 self.stop()

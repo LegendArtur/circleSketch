@@ -75,7 +75,7 @@ class GameManagement(commands.Cog):
         if state.get('theme') and state.get('manual_game_starter_id'):
             await interaction.followup.send("A manual game is already running.", ephemeral=True)
             return
-        circle = Storage.get_player_circle()
+        circle = Storage.get_player_circle(interaction.guild.id)
         if len(circle) < 1:
             await interaction.followup.send("Not enough players to start the game.", ephemeral=True)
             logger.warning("Not enough players to start the game.")

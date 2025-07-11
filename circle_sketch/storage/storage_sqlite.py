@@ -24,7 +24,8 @@ class Storage:
             conn = Storage._get_conn()
             c = conn.cursor()
             c.execute('''CREATE TABLE IF NOT EXISTS player_circle (
-                user_id INTEGER PRIMARY KEY
+                user_id INTEGER PRIMARY KEY,
+                guild_id INTEGER
             )''')
             c.execute('''CREATE TABLE IF NOT EXISTS game_state (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -61,20 +62,27 @@ class Storage:
             sys.exit(1)
 
     @staticmethod
-    def get_player_circle():
+    def get_player_circle(guild_id=None):
         conn = Storage._get_conn()
         c = conn.cursor()
-        c.execute('SELECT user_id FROM player_circle')
+        if guild_id is not None:
+            c.execute('SELECT user_id FROM player_circle WHERE guild_id=?', (guild_id,))
+        else:
+            c.execute('SELECT user_id FROM player_circle')
         result = [row['user_id'] for row in c.fetchall()]
         conn.close()
         return result
 
     @staticmethod
-    def set_player_circle(circle):
+    def set_player_circle(guild_id, circle):
         conn = Storage._get_conn()
         c = conn.cursor()
-        c.execute('DELETE FROM player_circle')
-        c.executemany('INSERT INTO player_circle (user_id) VALUES (?)', [(uid,) for uid in circle])
+        if guild_id is not None:
+            c.execute('DELETE FROM player_circle WHERE guild_id=?', (guild_id,))
+            c.executemany('INSERT INTO player_circle (user_id, guild_id) VALUES (?, ?)', [(uid, guild_id) for uid in circle])
+        else:
+            c.execute('DELETE FROM player_circle')
+            c.executemany('INSERT INTO player_circle (user_id) VALUES (?)', [(uid,) for uid in circle])
         conn.commit()
         conn.close()
 
