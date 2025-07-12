@@ -209,4 +209,19 @@ class MySQLStorage:
         conn.commit()
         conn.close()
 
+    @staticmethod
+    async def download_image(url):
+        """Download an image from a Discord URL to a temp file and return the file path."""
+        import aiohttp, tempfile
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    if resp.status != 200:
+                        raise Exception(f"Failed to download image: {resp.status}")
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp:
+                        tmp.write(await resp.read())
+                        return tmp.name
+        except Exception as e:
+            raise Exception(f"Error downloading image: {e}")
+
 MySQLStorage.init()
