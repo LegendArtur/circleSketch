@@ -234,36 +234,43 @@ class GameManagement(commands.Cog):
             streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)} 🔥" if Storage.get_user_streak(uid) > 0 else f"<@{uid}>: 0" for uid in user_ids]
         await interaction.followup.send(f"Current group streak: {group_streak} 🔥\n\nUser streaks:\n" + "\n".join(streak_lines), ephemeral=True)
 
-    @app_commands.command(name="test_image_upload", description="Admin only: Upload an image and get it sent to your DM.")
+    @app_commands.command(name="test_image_upload", description="Admin only: Send a DM to a user, receive their image reply, and post it in Discord.")
     async def test_image_upload(self, interaction: Interaction):
         # Admin check
         if not is_admin(interaction):
             await interaction.response.send_message("You must be an admin to use this command.", ephemeral=True)
             return
-        await interaction.response.send_message("Please upload an image in reply to this message.", ephemeral=True)
+        # Send DM to user
+        try:
+            await interaction.user.send("Please reply to this DM with an image attachment.")
+            await interaction.response.send_message("Check your DMs and reply with an image.", ephemeral=True)
+        except Exception:
+            await interaction.response.send_message("Failed to send DM. Please check your DM settings.", ephemeral=True)
+            return
 
         def check(msg):
             return (
                 msg.author.id == interaction.user.id and
-                msg.channel.id == interaction.channel.id and
+                isinstance(msg.channel, discord.DMChannel) and
                 msg.attachments
             )
 
         try:
-            msg = await self.bot.wait_for("message", timeout=60, check=check)
+            msg = await self.bot.wait_for("message", timeout=120, check=check)
         except Exception:
-            await interaction.followup.send("No image received in time.", ephemeral=True)
+            await interaction.followup.send("No image received in DM within 2 minutes.", ephemeral=True)
             return
 
         attachment = msg.attachments[0]
         image_bytes = await attachment.read()
         file = discord.File(io.BytesIO(image_bytes), filename=attachment.filename)
 
+        # Send the image back in the original Discord channel
         try:
-            await interaction.user.send("Here is your uploaded image:", file=file)
-            await interaction.followup.send("Image sent to your DM!", ephemeral=True)
+            await interaction.channel.send(f"<@{interaction.user.id}> uploaded this image:", file=file)
+            await interaction.followup.send("Image received and posted in this channel!", ephemeral=True)
         except Exception:
-            await interaction.followup.send("Failed to send DM. Please check your DM settings.", ephemeral=True)
+            await interaction.followup.send("Failed to post image in channel.", ephemeral=True)
 
     async def scheduled_start_game(self):
         circle = Storage.get_player_circle()
