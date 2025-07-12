@@ -234,15 +234,15 @@ class GameManagement(commands.Cog):
             streak_lines = [f"<@{uid}>: {Storage.get_user_streak(uid)} 🔥" if Storage.get_user_streak(uid) > 0 else f"<@{uid}>: 0" for uid in user_ids]
         await interaction.followup.send(f"Current group streak: {group_streak} 🔥\n\nUser streaks:\n" + "\n".join(streak_lines), ephemeral=True)
 
-    @app_commands.command(name="test_image_upload", description="Admin only: Send a DM to a user, receive their image reply, and post it in Discord.")
-    async def test_image_upload(self, interaction: Interaction):
+    @app_commands.command(name="test_image_submission", description="Admin only: Simulate a gallery submission preview for your image.")
+    async def test_image_submission(self, interaction: Interaction):
         # Admin check
         if not is_admin(interaction):
             await interaction.response.send_message("You must be an admin to use this command.", ephemeral=True)
             return
         # Send DM to user
         try:
-            await interaction.user.send("Please reply to this DM with an image attachment.")
+            await interaction.user.send("[TESTING]\nPlease reply to this DM with an image attachment. This is how your submission would look like.")
             await interaction.response.send_message("Check your DMs and reply with an image.", ephemeral=True)
         except Exception:
             await interaction.response.send_message("Failed to send DM. Please check your DM settings.", ephemeral=True)
@@ -262,15 +262,23 @@ class GameManagement(commands.Cog):
             return
 
         attachment = msg.attachments[0]
-        image_bytes = await attachment.read()
-        file = discord.File(io.BytesIO(image_bytes), filename=attachment.filename)
+        # Save image to a temporary URL (simulate Discord URL)
+        # For preview, we can use the attachment's URL directly
+        drawing_url = attachment.url
+        from ..gallery.gallery import make_gallery_image
+        import datetime
+        theme = "[TESTING]"
+        date_str = datetime.datetime.now().strftime('%Y-%m-%d')
+        # Generate preview image
+        preview_bytes = make_gallery_image(theme, date_str, interaction.user, drawing_url)
+        file = discord.File(preview_bytes, filename="test_submission_preview.png")
 
-        # Send the image back in the original Discord channel
+        # Send the preview image in the original Discord channel
         try:
-            await interaction.channel.send(f"<@{interaction.user.id}> uploaded this image:", file=file)
-            await interaction.followup.send("Image received and posted in this channel!", ephemeral=True)
+            await interaction.channel.send(f"[TESTING] This is how your submission would look like:", file=file)
+            await interaction.followup.send("Preview image posted in this channel!", ephemeral=True)
         except Exception:
-            await interaction.followup.send("Failed to post image in channel.", ephemeral=True)
+            await interaction.followup.send("Failed to post preview image in channel.", ephemeral=True)
 
     async def scheduled_start_game(self):
         circle = Storage.get_player_circle()
