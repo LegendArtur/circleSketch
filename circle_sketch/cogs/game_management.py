@@ -138,15 +138,15 @@ class GameManagement(commands.Cog):
                 temp_path = None
                 try:
                     user = await self.bot.fetch_user(int(user_id))
-                    # If img_path is a Discord URL, download it to a temp file
+                    # If img_path is a Discord URL, use it directly for make_gallery_image
                     if img_path.startswith('http'):
-                        temp_path = await Storage.download_image(img_path)
-                        img_to_open = temp_path
+                        drawing_url = img_path
                     else:
-                        img_to_open = img_path
-                    with open(img_to_open, 'rb') as f:
-                        img_bytes = f.read()
-                    file = discord.File(io.BytesIO(img_bytes), filename=f"gallery_{user_id}.png")
+                        # Save local file to a temporary URL for preview (simulate Discord URL)
+                        drawing_url = img_path
+                    from ..gallery.gallery import make_gallery_image
+                    preview_bytes = make_gallery_image(theme, date, user, drawing_url)
+                    file = discord.File(preview_bytes, filename=f"gallery_{user_id}.png")
                     await channel.send(file=file)
                 except Exception as e:
                     await channel.send(f"Failed to generate gallery image for <@{user_id}>: {e}")
